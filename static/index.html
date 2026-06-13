@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG 文档问答</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-alt: #f8fbff;
+      --border: #d6e0ef;
+      --text: #1c2434;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --accent: #eff6ff;
+      --success: #15803d;
+      --danger: #dc2626;
+      --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, #dbeafe 0, transparent 26%),
+        linear-gradient(180deg, #f7faff 0%, var(--bg) 100%);
+    }
+
+    .page {
+      max-width: 1260px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      padding: 28px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+    }
+
+    .hero p {
+      margin: 0;
+      line-height: 1.7;
+      color: var(--muted);
+      max-width: 860px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(110px, 1fr));
+      gap: 12px;
+      min-width: 360px;
+    }
+
+    .stat-card {
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--panel-alt);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+      margin-top: 20px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 20px 22px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-alt);
+    }
+
+    .panel-header h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+
+    .panel-header p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .panel-body {
+      padding: 20px 22px 22px;
+    }
+
+    .field {
+      margin-bottom: 18px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    input[type="file"],
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #fff;
+      color: var(--text);
+      padding: 13px 14px;
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 14px;
+      padding: 11px 16px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    .primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .secondary {
+      background: #e7efff;
+      color: #133b92;
+    }
+
+    .secondary:hover {
+      background: #dce8ff;
+    }
+
+    .ghost {
+      background: #f3f6fb;
+      color: #345;
+    }
+
+    .ghost:hover {
+      background: #e8eef8;
+    }
+
+    button:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .status.success {
+      color: var(--success);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .count {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .file-list {
+      display: grid;
+      gap: 10px;
+      max-height: 470px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .file-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+    }
+
+    .file-main {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+      cursor: pointer;
+    }
+
+    .file-item.selected {
+      border-color: #94b8ff;
+      background: #f5f9ff;
+    }
+
+    .file-main input {
+      margin-top: 3px;
+    }
+
+    .file-name {
+      font-weight: 700;
+      margin-bottom: 4px;
+      word-break: break-word;
+    }
+
+    .file-desc {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--muted);
+      word-break: break-word;
+    }
+
+    .quick-questions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: #294063;
+      padding: 9px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .chip:hover {
+      background: #f3f7ff;
+    }
+
+    .danger-button {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .danger-button:hover {
+      background: #fecaca;
+    }
+
+    .answer-shell,
+    .sources-shell {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #fbfdff;
+    }
+
+    .section-head strong {
+      font-size: 15px;
+    }
+
+    .section-meta {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .answer-content {
+      min-height: 150px;
+      padding: 18px 16px;
+      white-space: pre-wrap;
+      line-height: 1.8;
+    }
+
+    .sources-list {
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+    }
+
+    .source-card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: #fcfdff;
+      padding: 14px 16px;
+    }
+
+    .source-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .source-title {
+      font-weight: 700;
+      color: #163a76;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e8f0ff;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .source-meta {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .source-content {
+      white-space: pre-wrap;
+      line-height: 1.8;
+    }
+
+    .empty {
+      padding: 18px 16px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .tips {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--accent);
+      color: #1d4ed8;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 1024px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats {
+        min-width: 0;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        padding: 16px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="hero-grid">
+        <div>
+          <h1>RAG 文档问答系统</h1>
+          <p>上传文档后建立知识库，勾选检索范围，输入问题即可得到答案和引用证据。当前页面已经接到 FastAPI 接口，适合直接做本地演示。</p>
+        </div>
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-label">知识库文件数</div>
+            <div id="totalFilesStat" class="stat-value">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">当前选中文件</div>
+            <div id="selectedFilesStat" class="stat-value">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">最近命中片段</div>
+            <div id="sourceCountStat" class="stat-value">0</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>知识库管理</h2>
+          <p>支持上传 `txt`、`pdf`、`docx`。文件列表支持全选、清空、单条删除和保留已选状态。</p>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="fileInput">上传文档</label>
+            <input id="fileInput" type="file" accept=".txt,.pdf,.docx">
+            <div class="hint">上传后会自动切块、向量化并写入当前知识库。</div>
+          </div>
+
+          <div class="row">
+            <button id="uploadBtn" class="primary">上传并入库</button>
+            <button id="refreshBtn" class="secondary">刷新文件列表</button>
+          </div>
+          <div id="uploadStatus" class="status"></div>
+
+          <div class="field" style="margin-top: 22px;">
+            <div class="toolbar">
+              <label style="margin: 0;">检索文件范围</label>
+              <div class="row">
+                <button id="selectAllBtn" class="ghost" type="button">全选</button>
+                <button id="clearSelectionBtn" class="ghost" type="button">清空</button>
+              </div>
+            </div>
+            <div class="count" id="selectionSummary">已选 0 / 0</div>
+            <div id="fileList" class="file-list" style="margin-top: 12px;">
+              <div class="empty">正在加载文件列表...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>问答区</h2>
+          <p>使用单次 `/chat` 请求返回答案和来源。按 `Ctrl + Enter` 也可以直接提问。</p>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label>快捷问题</label>
+            <div id="quickQuestions" class="quick-questions">
+              <button class="chip" type="button" data-question="这份文档的核心内容是什么？">总结核心内容</button>
+              <button class="chip" type="button" data-question="文档里有哪些关键概念或分类？">提取关键概念</button>
+              <button class="chip" type="button" data-question="请按时间顺序梳理文档中的重要事件。">梳理时间线</button>
+              <button class="chip" type="button" data-question="请列出文档中提到的优点、局限或问题。">列出优点和局限</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="queryInput">请输入你的问题</label>
+            <textarea id="queryInput" placeholder="例如：文档中提到的机器学习三大范式是什么？"></textarea>
+            <div class="hint">不勾选文件时，会默认在全部已入库文档中检索。</div>
+          </div>
+
+          <div class="row">
+            <button id="askBtn" class="primary">开始提问</button>
+            <button id="clearQuestionBtn" class="ghost" type="button">清空问题</button>
+          </div>
+          <div id="chatStatus" class="status"></div>
+
+          <div class="field" style="margin-top: 22px;">
+            <div class="answer-shell">
+              <div class="section-head">
+                <strong>回答结果</strong>
+                <span class="section-meta" id="answerMeta">等待提问</span>
+              </div>
+              <div id="answerBox" class="answer-content">提问后会在这里显示回答。</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="sources-shell">
+              <div class="section-head">
+                <strong>参考来源</strong>
+                <span class="section-meta" id="sourcesMeta">暂无片段</span>
+              </div>
+              <div id="sourcesBox" class="empty">提问后会在这里展示命中的检索片段。</div>
+            </div>
+          </div>
+
+          <div class="tips">
+            建议优先选择和问题强相关的文件，这样重排结果更稳定，也更容易看出回答依据来自哪几段内容。
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const state = {
+      files: [],
+      selectedFileIds: new Set(),
+      lastSourceCount: 0
+    };
+
+    const fileInput = document.getElementById("fileInput");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const selectAllBtn = document.getElementById("selectAllBtn");
+    const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+    const uploadStatus = document.getElementById("uploadStatus");
+    const fileList = document.getElementById("fileList");
+    const selectionSummary = document.getElementById("selectionSummary");
+    const queryInput = document.getElementById("queryInput");
+    const askBtn = document.getElementById("askBtn");
+    const clearQuestionBtn = document.getElementById("clearQuestionBtn");
+    const chatStatus = document.getElementById("chatStatus");
+    const answerBox = document.getElementById("answerBox");
+    const answerMeta = document.getElementById("answerMeta");
+    const sourcesBox = document.getElementById("sourcesBox");
+    const sourcesMeta = document.getElementById("sourcesMeta");
+    const totalFilesStat = document.getElementById("totalFilesStat");
+    const selectedFilesStat = document.getElementById("selectedFilesStat");
+    const sourceCountStat = document.getElementById("sourceCountStat");
+    const quickQuestions = document.getElementById("quickQuestions");
+
+    function setStatus(element, message, type) {
+      element.textContent = message || "";
+      element.className = type ? `status ${type}` : "status";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function formatDate(value) {
+      if (!value) {
+        return "时间未知";
+      }
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return value;
+      }
+      return date.toLocaleString("zh-CN", { hour12: false });
+    }
+
+    function updateStats() {
+      totalFilesStat.textContent = String(state.files.length);
+      selectedFilesStat.textContent = String(state.selectedFileIds.size);
+      sourceCountStat.textContent = String(state.lastSourceCount);
+      selectionSummary.textContent = `已选 ${state.selectedFileIds.size} / ${state.files.length}`;
+    }
+
+    function getSelectedFileIds() {
+      return Array.from(state.selectedFileIds);
+    }
+
+    function renderFiles() {
+      if (state.files.length === 0) {
+        fileList.innerHTML = '<div class="empty">还没有文件，先上传一个文档试试。</div>';
+        updateStats();
+        return;
+      }
+
+        fileList.innerHTML = state.files.map((file) => {
+        const checked = state.selectedFileIds.has(file.file_id);
+        return `
+          <div class="file-item ${checked ? "selected" : ""}">
+            <label class="file-main">
+              <input type="checkbox" name="fileIds" value="${escapeHtml(file.file_id)}" ${checked ? "checked" : ""}>
+              <div>
+                <div class="file-name">${escapeHtml(file.file_name)}</div>
+                <div class="file-desc">文件 ID：${escapeHtml(file.file_id)}</div>
+                <div class="file-desc">创建时间：${escapeHtml(formatDate(file.created_at))}</div>
+              </div>
+            </label>
+            <button
+              class="danger-button delete-file-btn"
+              type="button"
+              data-file-id="${escapeHtml(file.file_id)}"
+              data-file-name="${escapeHtml(file.file_name)}"
+            >
+              删除
+            </button>
+          </div>
+        `;
+      }).join("");
+
+      updateStats();
+    }
+
+    function syncSelectedFromDom() {
+      const checkedItems = document.querySelectorAll("input[name='fileIds']:checked");
+      state.selectedFileIds = new Set(Array.from(checkedItems).map((item) => item.value));
+      renderFiles();
+    }
+
+    async function loadFiles() {
+      fileList.innerHTML = '<div class="empty">正在加载文件列表...</div>';
+      try {
+        const response = await fetch("/files");
+        if (!response.ok) {
+          throw new Error("文件列表加载失败");
+        }
+        const files = await response.json();
+        state.files = Array.isArray(files) ? files : [];
+
+        const validIds = new Set(state.files.map((file) => file.file_id));
+        state.selectedFileIds = new Set(
+          Array.from(state.selectedFileIds).filter((fileId) => validIds.has(fileId))
+        );
+
+        renderFiles();
+      } catch (error) {
+        fileList.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+        state.files = [];
+        updateStats();
+      }
+    }
+
+    async function uploadFile() {
+      const file = fileInput.files[0];
+      if (!file) {
+        setStatus(uploadStatus, "请先选择一个文档文件。", "error");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      uploadBtn.disabled = true;
+      setStatus(uploadStatus, "正在上传并入库，请稍候...");
+
+      try {
+        const response = await fetch("/upload", {
+          method: "POST",
+          body: formData
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || "上传失败");
+        }
+        setStatus(uploadStatus, `上传成功：${data.file_name}（${data.file_id}）`, "success");
+        state.selectedFileIds.add(data.file_id);
+        fileInput.value = "";
+        await loadFiles();
+      } catch (error) {
+        setStatus(uploadStatus, error.message || "上传失败", "error");
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    }
+
+    async function deleteFile(fileId, fileName) {
+      const confirmed = window.confirm(`确认删除文件“${fileName}”吗？这会同时清理向量库中的相关片段。`);
+      if (!confirmed) {
+        return;
+      }
+
+      setStatus(uploadStatus, `正在删除 ${fileName} ...`);
+
+      try {
+        const response = await fetch(`/files/${encodeURIComponent(fileId)}`, {
+          method: "DELETE"
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "删除失败");
+        }
+
+        state.selectedFileIds.delete(fileId);
+        state.lastSourceCount = 0;
+        answerBox.textContent = "提问后会在这里显示回答。";
+        answerMeta.textContent = "等待提问";
+        sourcesBox.className = "empty";
+        sourcesBox.textContent = "提问后会在这里展示命中的检索片段。";
+        sourcesMeta.textContent = "暂无片段";
+        setStatus(uploadStatus, `${fileName} 删除成功，已清理 ${data.deleted_vector_count || 0} 个向量片段。`, "success");
+        await loadFiles();
+      } catch (error) {
+        setStatus(uploadStatus, error.message || "删除失败", "error");
+      }
+    }
+
+    function renderSources(items) {
+      if (!Array.isArray(items) || items.length === 0) {
+        sourcesBox.className = "empty";
+        sourcesBox.innerHTML = "没有检索到参考片段。";
+        sourcesMeta.textContent = "暂无片段";
+        state.lastSourceCount = 0;
+        updateStats();
+        return;
+      }
+
+      sourcesBox.className = "sources-list";
+      sourcesBox.innerHTML = items.map((item, index) => `
+        <div class="source-card">
+          <div class="source-top">
+            <div class="source-title">${escapeHtml(item.file_name || "未知文件")}</div>
+            <span class="badge">Top ${index + 1}</span>
+          </div>
+          <div class="source-meta">
+            片段：${escapeHtml(item.chunk_id || "")} | 文件 ID：${escapeHtml(item.file_id || "")}
+          </div>
+          <div class="source-content">${escapeHtml(item.content || "")}</div>
+        </div>
+      `).join("");
+
+      state.lastSourceCount = items.length;
+      sourcesMeta.textContent = `共命中 ${items.length} 个参考片段`;
+      updateStats();
+    }
+
+    async function askQuestion() {
+      const query = queryInput.value.trim();
+      if (!query) {
+        setStatus(chatStatus, "请输入问题后再提问。", "error");
+        return;
+      }
+
+      const selectedIds = getSelectedFileIds();
+      const payload = {
+        query,
+        file_ids: selectedIds.length > 0 ? selectedIds : null
+      };
+
+      askBtn.disabled = true;
+      answerBox.textContent = "正在生成回答...";
+      answerMeta.textContent = "检索与生成中";
+      sourcesBox.className = "empty";
+      sourcesBox.textContent = "正在整理参考片段...";
+      sourcesMeta.textContent = "处理中";
+      setStatus(chatStatus, "正在检索并生成回答...");
+
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "问答请求失败");
+        }
+
+        answerBox.textContent = data.answer || "模型没有返回内容。";
+        answerMeta.textContent = selectedIds.length > 0
+          ? `限定 ${selectedIds.length} 个文件检索`
+          : "默认在全部文件中检索";
+        renderSources(data.sources || []);
+        setStatus(chatStatus, `回答完成，共返回 ${data.source_count || 0} 个参考片段。`, "success");
+      } catch (error) {
+        answerBox.textContent = "请求失败，请检查后端服务和模型配置。";
+        answerMeta.textContent = "请求失败";
+        renderSources([]);
+        setStatus(chatStatus, error.message || "提问失败", "error");
+      } finally {
+        askBtn.disabled = false;
+      }
+    }
+
+    function selectAllFiles() {
+      state.selectedFileIds = new Set(state.files.map((file) => file.file_id));
+      renderFiles();
+    }
+
+    function clearSelection() {
+      state.selectedFileIds = new Set();
+      renderFiles();
+    }
+
+    fileList.addEventListener("change", (event) => {
+      if (event.target && event.target.matches("input[name='fileIds']")) {
+        syncSelectedFromDom();
+      }
+    });
+
+    fileList.addEventListener("click", (event) => {
+      const button = event.target.closest(".delete-file-btn");
+      if (!button) {
+        return;
+      }
+      deleteFile(button.dataset.fileId || "", button.dataset.fileName || "当前文件");
+    });
+
+    quickQuestions.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-question]");
+      if (!button) {
+        return;
+      }
+      queryInput.value = button.dataset.question || "";
+      queryInput.focus();
+    });
+
+    queryInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && event.ctrlKey) {
+        event.preventDefault();
+        askQuestion();
+      }
+    });
+
+    uploadBtn.addEventListener("click", uploadFile);
+    refreshBtn.addEventListener("click", loadFiles);
+    selectAllBtn.addEventListener("click", selectAllFiles);
+    clearSelectionBtn.addEventListener("click", clearSelection);
+    askBtn.addEventListener("click", askQuestion);
+    clearQuestionBtn.addEventListener("click", () => {
+      queryInput.value = "";
+      queryInput.focus();
+    });
+
+    updateStats();
+    loadFiles();
+  </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+app.db
+uploads
+.env
+chroma_db/
+fastapi.txt
