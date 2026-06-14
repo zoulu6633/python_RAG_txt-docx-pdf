@@ -141,6 +141,8 @@
     }
 
     input[type="file"],
+    input[type="text"],
+    select,
     textarea {
       width: 100%;
       border: 1px solid var(--border);
@@ -155,6 +157,12 @@
       min-height: 150px;
       resize: vertical;
       line-height: 1.7;
+    }
+
+    .split-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
     }
 
     .row {
@@ -316,6 +324,13 @@
       background: #f3f7ff;
     }
 
+    .category-chip.active {
+      border-color: #94b8ff;
+      background: #e8f0ff;
+      color: #133b92;
+      font-weight: 700;
+    }
+
     .danger-button {
       background: #fee2e2;
       color: #b91c1c;
@@ -449,6 +464,10 @@
       .stats {
         grid-template-columns: 1fr;
       }
+
+      .split-fields {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -490,11 +509,32 @@
             <div class="hint">上传后会自动切块、向量化并写入当前知识库。</div>
           </div>
 
+          <div class="field">
+            <label for="categorySelect">上传分类</label>
+            <select id="categorySelect">
+              <option value="study">学习</option>
+              <option value="work">工作</option>
+              <option value="life">生活</option>
+            </select>
+            <div class="hint">上传时只能从固定分类中选择，后续文件管理与问答会按这个分类使用。</div>
+          </div>
+
           <div class="row">
             <button id="uploadBtn" class="primary">上传并入库</button>
             <button id="refreshBtn" class="secondary">刷新文件列表</button>
           </div>
           <div id="uploadStatus" class="status"></div>
+
+          <div class="field" style="margin-top: 22px;">
+            <div class="toolbar">
+              <label style="margin: 0;">分类筛选</label>
+              <div class="count" id="activeCategorySummary">当前：全部分类</div>
+            </div>
+            <div id="categoryList" class="quick-questions" style="margin-bottom: 0;">
+              <button class="chip category-chip active" type="button">全部分类</button>
+            </div>
+            <div class="hint">切换分类后，左侧文件列表只显示当前分类；提问时默认也会限制到当前分类。</div>
+          </div>
 
           <div class="field" style="margin-top: 22px;">
             <div class="toolbar">
@@ -531,7 +571,7 @@
           <div class="field">
             <label for="queryInput">请输入你的问题</label>
             <textarea id="queryInput" placeholder="例如：文档中提到的机器学习三大范式是什么？"></textarea>
-            <div class="hint">不勾选文件时，会默认在全部已入库文档中检索。</div>
+            <div class="hint">检索时会自动使用当前分类作为 `category_ids`，并使用你勾选的文件作为 `file_ids`。如果两者都不选，则默认搜索全部文档。</div>
           </div>
 
           <div class="row">
@@ -569,18 +609,30 @@
   </div>
 
   <script>
+    const ALL_CATEGORY_VALUE = "__all__";
+    const CATEGORY_OPTIONS = [
+      { id: "study", name: "学习" },
+      { id: "work", name: "工作" },
+      { id: "life", name: "生活" }
+    ];
+
     const state = {
       files: [],
+      categories: [],
+      activeCategoryId: ALL_CATEGORY_VALUE,
       selectedFileIds: new Set(),
       lastSourceCount: 0
     };
 
     const fileInput = document.getElementById("fileInput");
+    const categorySelect = document.getElementById("categorySelect");
     const uploadBtn = document.getElementById("uploadBtn");
     const refreshBtn = document.getElementById("refreshBtn");
     const selectAllBtn = document.getElementById("selectAllBtn");
     const clearSelectionBtn = document.getElementById("clearSelectionBtn");
     const uploadStatus = document.getElementById("uploadStatus");
+    const categoryList = document.getElementById("categoryList");
+    const activeCategorySummary = document.getElementById("activeCategorySummary");
     const fileList = document.getElementById("fileList");
     const selectionSummary = document.getElementById("selectionSummary");
     const queryInput = document.getElementById("queryInput");
@@ -621,32 +673,140 @@
       return date.toLocaleString("zh-CN", { hour12: false });
     }
 
+    function normalizeCategory(file) {
+      const predefined = CATEGORY_OPTIONS.find((category) => category.id === file.category_id);
+      return {
+        id: file.category_id || "study",
+        name: predefined?.name || file.category_name || file.category_id || "未分类"
+      };
+    }
+
+    function rebuildCategories() {
+      const categories = new Map(
+        CATEGORY_OPTIONS.map((category) => [
+          category.id,
+          {
+            id: category.id,
+            name: category.name,
+            count: 0
+          }
+        ])
+      );
+
+      state.files.forEach((file) => {
+        const category = normalizeCategory(file);
+        if (!categories.has(category.id)) {
+          categories.set(category.id, {
+            id: category.id,
+            name: category.name,
+            count: 0
+          });
+        }
+        categories.get(category.id).count += 1;
+      });
+
+      state.categories = CATEGORY_OPTIONS.map((category) => categories.get(category.id)).filter(Boolean);
+
+      const validCategoryIds = new Set(state.categories.map((category) => category.id));
+      if (state.activeCategoryId !== ALL_CATEGORY_VALUE && !validCategoryIds.has(state.activeCategoryId)) {
+        state.activeCategoryId = ALL_CATEGORY_VALUE;
+      }
+    }
+
+    function getActiveCategory() {
+      if (state.activeCategoryId === ALL_CATEGORY_VALUE) {
+        return null;
+      }
+
+      return state.categories.find((category) => category.id === state.activeCategoryId) || null;
+    }
+
+    function getVisibleFiles() {
+      if (state.activeCategoryId === ALL_CATEGORY_VALUE) {
+        return state.files;
+      }
+
+      return state.files.filter((file) => normalizeCategory(file).id === state.activeCategoryId);
+    }
+
+    function getSelectedVisibleFileIds() {
+      const visibleIds = new Set(getVisibleFiles().map((file) => file.file_id));
+      return getSelectedFileIds().filter((fileId) => visibleIds.has(fileId));
+    }
+
     function updateStats() {
       totalFilesStat.textContent = String(state.files.length);
       selectedFilesStat.textContent = String(state.selectedFileIds.size);
       sourceCountStat.textContent = String(state.lastSourceCount);
-      selectionSummary.textContent = `已选 ${state.selectedFileIds.size} / ${state.files.length}`;
+
+      const visibleFiles = getVisibleFiles();
+      const selectedVisibleCount = getSelectedVisibleFileIds().length;
+      const activeCategory = getActiveCategory();
+      selectionSummary.textContent = activeCategory
+        ? `当前分类 ${visibleFiles.length} 个文件，已选 ${selectedVisibleCount} 个`
+        : `已选 ${state.selectedFileIds.size} / ${state.files.length}`;
+      activeCategorySummary.textContent = activeCategory
+        ? `当前：${activeCategory.name}（${activeCategory.count}）`
+        : `当前：全部分类（${state.files.length}）`;
     }
 
     function getSelectedFileIds() {
       return Array.from(state.selectedFileIds);
     }
 
+    function renderCategories() {
+      const buttons = [
+        `
+          <button
+            class="chip category-chip ${state.activeCategoryId === ALL_CATEGORY_VALUE ? "active" : ""}"
+            type="button"
+            data-category-id="${ALL_CATEGORY_VALUE}"
+          >
+            全部分类 (${state.files.length})
+          </button>
+        `
+      ];
+
+      state.categories.forEach((category) => {
+        buttons.push(`
+          <button
+            class="chip category-chip ${state.activeCategoryId === category.id ? "active" : ""}"
+            type="button"
+            data-category-id="${escapeHtml(category.id)}"
+          >
+            ${escapeHtml(category.name)} (${category.count})
+          </button>
+        `);
+      });
+
+      categoryList.innerHTML = buttons.join("");
+    }
+
     function renderFiles() {
+      const visibleFiles = getVisibleFiles();
+
       if (state.files.length === 0) {
         fileList.innerHTML = '<div class="empty">还没有文件，先上传一个文档试试。</div>';
         updateStats();
         return;
       }
 
-        fileList.innerHTML = state.files.map((file) => {
+      if (visibleFiles.length === 0) {
+        fileList.innerHTML = '<div class="empty">当前分类下还没有文件，切换分类或先上传一个文档试试。</div>';
+        updateStats();
+        return;
+      }
+
+      fileList.innerHTML = visibleFiles.map((file) => {
         const checked = state.selectedFileIds.has(file.file_id);
+        const category = normalizeCategory(file);
         return `
           <div class="file-item ${checked ? "selected" : ""}">
             <label class="file-main">
               <input type="checkbox" name="fileIds" value="${escapeHtml(file.file_id)}" ${checked ? "checked" : ""}>
               <div>
                 <div class="file-name">${escapeHtml(file.file_name)}</div>
+                <div class="file-desc">分类：${escapeHtml(category.name)} (${escapeHtml(category.id)})</div>
                 <div class="file-desc">文件 ID：${escapeHtml(file.file_id)}</div>
                 <div class="file-desc">创建时间：${escapeHtml(formatDate(file.created_at))}</div>
               </div>
@@ -666,12 +826,6 @@
       updateStats();
     }
 
-    function syncSelectedFromDom() {
-      const checkedItems = document.querySelectorAll("input[name='fileIds']:checked");
-      state.selectedFileIds = new Set(Array.from(checkedItems).map((item) => item.value));
-      renderFiles();
-    }
-
     async function loadFiles() {
       fileList.innerHTML = '<div class="empty">正在加载文件列表...</div>';
       try {
@@ -687,10 +841,15 @@
           Array.from(state.selectedFileIds).filter((fileId) => validIds.has(fileId))
         );
 
+        rebuildCategories();
+        renderCategories();
         renderFiles();
       } catch (error) {
         fileList.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
         state.files = [];
+        state.categories = [];
+        state.activeCategoryId = ALL_CATEGORY_VALUE;
+        renderCategories();
         updateStats();
       }
     }
@@ -702,14 +861,19 @@
         return;
       }
 
+      const selectedCategory = CATEGORY_OPTIONS.find((category) => category.id === categorySelect.value) || CATEGORY_OPTIONS[0];
+      const categoryId = selectedCategory.id;
+      const categoryName = selectedCategory.name;
+
       const formData = new FormData();
       formData.append("file", file);
+      const uploadUrl = `/upload?category_id=${encodeURIComponent(categoryId)}&category_name=${encodeURIComponent(categoryName)}`;
 
       uploadBtn.disabled = true;
       setStatus(uploadStatus, "正在上传并入库，请稍候...");
 
       try {
-        const response = await fetch("/upload", {
+        const response = await fetch(uploadUrl, {
           method: "POST",
           body: formData
         });
@@ -719,6 +883,8 @@
         }
         setStatus(uploadStatus, `上传成功：${data.file_name}（${data.file_id}）`, "success");
         state.selectedFileIds.add(data.file_id);
+        state.activeCategoryId = categoryId;
+        categorySelect.value = categoryId;
         fileInput.value = "";
         await loadFiles();
       } catch (error) {
@@ -788,6 +954,31 @@
       updateStats();
     }
 
+    function buildSearchPayload(query) {
+      const selectedIds = getSelectedFileIds();
+      const activeCategory = getActiveCategory();
+      const categoryIds = activeCategory ? [activeCategory.id] : null;
+      const fileIds = selectedIds.length > 0 ? selectedIds : null;
+      let answerMetaText = "默认在全部文档中检索";
+
+      if (categoryIds && fileIds) {
+        answerMetaText = `限定分类“${activeCategory.name}”并按 ${fileIds.length} 个已选文件检索`;
+      } else if (categoryIds) {
+        answerMetaText = `限定分类“${activeCategory.name}”检索`;
+      } else if (fileIds) {
+        answerMetaText = `限定 ${fileIds.length} 个已选文件检索`;
+      }
+
+      return {
+        payload: {
+          query,
+          file_ids: fileIds,
+          category_ids: categoryIds
+        },
+        answerMetaText
+      };
+    }
+
     async function askQuestion() {
       const query = queryInput.value.trim();
       if (!query) {
@@ -795,11 +986,13 @@
         return;
       }
 
-      const selectedIds = getSelectedFileIds();
-      const payload = {
-        query,
-        file_ids: selectedIds.length > 0 ? selectedIds : null
-      };
+      let requestConfig;
+      try {
+        requestConfig = buildSearchPayload(query);
+      } catch (error) {
+        setStatus(chatStatus, error.message || "检索范围无效", "error");
+        return;
+      }
 
       askBtn.disabled = true;
       answerBox.textContent = "正在生成回答...";
@@ -815,7 +1008,7 @@
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(requestConfig.payload)
         });
 
         const data = await response.json();
@@ -824,9 +1017,7 @@
         }
 
         answerBox.textContent = data.answer || "模型没有返回内容。";
-        answerMeta.textContent = selectedIds.length > 0
-          ? `限定 ${selectedIds.length} 个文件检索`
-          : "默认在全部文件中检索";
+        answerMeta.textContent = requestConfig.answerMetaText;
         renderSources(data.sources || []);
         setStatus(chatStatus, `回答完成，共返回 ${data.source_count || 0} 个参考片段。`, "success");
       } catch (error) {
@@ -840,18 +1031,32 @@
     }
 
     function selectAllFiles() {
-      state.selectedFileIds = new Set(state.files.map((file) => file.file_id));
+      const nextSelected = new Set(state.selectedFileIds);
+      getVisibleFiles().forEach((file) => nextSelected.add(file.file_id));
+      state.selectedFileIds = nextSelected;
       renderFiles();
     }
 
     function clearSelection() {
-      state.selectedFileIds = new Set();
+      if (state.activeCategoryId === ALL_CATEGORY_VALUE) {
+        state.selectedFileIds = new Set();
+      } else {
+        const visibleIds = new Set(getVisibleFiles().map((file) => file.file_id));
+        state.selectedFileIds = new Set(
+          Array.from(state.selectedFileIds).filter((fileId) => !visibleIds.has(fileId))
+        );
+      }
       renderFiles();
     }
 
     fileList.addEventListener("change", (event) => {
       if (event.target && event.target.matches("input[name='fileIds']")) {
-        syncSelectedFromDom();
+        if (event.target.checked) {
+          state.selectedFileIds.add(event.target.value);
+        } else {
+          state.selectedFileIds.delete(event.target.value);
+        }
+        renderFiles();
       }
     });
 
@@ -861,6 +1066,17 @@
         return;
       }
       deleteFile(button.dataset.fileId || "", button.dataset.fileName || "当前文件");
+    });
+
+    categoryList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-category-id]");
+      if (!button) {
+        return;
+      }
+
+      state.activeCategoryId = button.dataset.categoryId || ALL_CATEGORY_VALUE;
+      renderCategories();
+      renderFiles();
     });
 
     quickQuestions.addEventListener("click", (event) => {

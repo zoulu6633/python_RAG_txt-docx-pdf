@@ -32,7 +32,9 @@ def init_file_db() -> None:
                 file_name TEXT NOT NULL,
                 saved_path TEXT NOT NULL,
                 user_id TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                category_id TEXT NOT NULL,
+                category_name TEXT NOT NULL
             )
             """
         )
@@ -68,6 +70,8 @@ def save_file_record(
     file_name: str,
     saved_path: str,
     user_id: str,
+    category_id: str,
+    category_name: str,
 ) -> None:
     init_file_db()
     created_at = datetime.now(UTC).isoformat()
@@ -75,10 +79,10 @@ def save_file_record(
     with _get_connection() as connection:
         connection.execute(
             """
-            INSERT INTO files(file_id, file_name, saved_path, user_id, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO files(file_id, file_name, saved_path, user_id, created_at, category_id, category_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (file_id, file_name, saved_path, user_id, created_at),
+            (file_id, file_name, saved_path, user_id, created_at, category_id, category_name),
         )
         connection.commit()
 
@@ -87,7 +91,7 @@ def list_file_records(user_id: str | None = None) -> list[dict[str, str]]:
     init_file_db()
 
     query = """
-        SELECT file_id, file_name, saved_path, user_id, created_at
+        SELECT file_id, file_name, saved_path, user_id, created_at, category_id, category_name
         FROM files
     """
     params: tuple[str, ...] = ()
@@ -110,7 +114,7 @@ def get_file_record(file_id: str) -> dict[str, str] | None:
     with _get_connection() as connection:
         row = connection.execute(
             """
-            SELECT file_id, file_name, saved_path, user_id, created_at
+            SELECT file_id, file_name, saved_path, user_id, created_at, category_id, category_name
             FROM files
             WHERE file_id = ?
             """,

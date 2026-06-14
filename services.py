@@ -32,14 +32,29 @@ compressor = CrossEncoderReranker(
     model=rerank_model,
     top_n=5
 )
-def build_retriever(file_ids: list[str] | None = None):
+def build_retriever(
+    file_ids: list[str] | None = None,
+    category_ids: list[str] | None = None
+):
     search_kwargs = {"k": 10}
-
+    filters = []
+    # 过滤文件
     if file_ids:
         if len(file_ids) == 1:
-            search_kwargs["filter"] = {"file_id": file_ids[0]}
+            filters.append({"file_id": file_ids[0]})
         else:
-            search_kwargs["filter"] = {"file_id": {"$in": file_ids}}
+            filters.append({"file_id": {"$in": file_ids}})
+    # 过滤分类
+    if category_ids:
+        if len(category_ids) == 1:
+            filters.append({"category_id": category_ids[0]})
+        else:
+            filters.append({"category_id": {"$in": category_ids}})
+    
+    if len(filters) == 1:
+        search_kwargs["filter"] = filters[0]
+    elif len(filters) > 1:
+        search_kwargs["filter"] = {"$and": filters}
     # 向量库召回 top 10
     base_retriever = vectorstore.as_retriever(
         search_type="similarity",
@@ -96,7 +111,7 @@ def get_loader(file_path: str):
     else:
         raise ValueError("不支持的文件类型")
 
-def add_documents(file_path: str,file_id: str, user_id: str, file_name: str):
+def add_documents(file_path: str,file_id: str, user_id: str, file_name: str, category_id: str, category_name: str):
     loader = get_loader(file_path)
     docs = loader.load()
 
@@ -115,7 +130,9 @@ def add_documents(file_path: str,file_id: str, user_id: str, file_name: str):
                 file_id=file_id,
                 file_name=file_name,
                 chunk_id=f"{file_id}_chunk_{i:03d}",
-                user_id=user_id
+                user_id=user_id,
+                category_id=category_id,
+                category_name=category_name
             )
         )
         chunk_records.append(chunk)
@@ -176,8 +193,8 @@ def serialize_documents(documents: list[Document]) -> list[SourceChunk]:
 
     return serialized
 
-def chat(query: str, file_ids: list[str] | None = None):
-    retriever = build_retriever(file_ids)
+def chat(query: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
+    retriever = build_retriever(file_ids, category_ids)
     reranked_results = retriever.invoke(query)
     sources = serialize_documents(reranked_results)
     selected_file_ids = file_ids or []
@@ -199,8 +216,8 @@ def chat(query: str, file_ids: list[str] | None = None):
         selected_file_ids=selected_file_ids,
     )
 
-def get_chunk(query: str, file_ids: list[str] | None = None):
-    retriever = build_retriever(file_ids)
+def get_chunk(query: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
+    retriever = build_retriever(file_ids, category_ids)
     retriever_results = retriever.invoke(query)
     return serialize_documents(retriever_results)
 

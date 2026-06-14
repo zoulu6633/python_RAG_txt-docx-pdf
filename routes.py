@@ -23,7 +23,7 @@ async def root():
     return {"message": "RAG frontend is not ready yet."}
     
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), category_id: str = "student", category_name: str = "学习"):
     original_file_name = Path(file.filename).name
     ext = Path(original_file_name).suffix.lower()
     if ext not in [".txt", ".pdf", ".docx"]:
@@ -39,13 +39,17 @@ async def upload_file(file: UploadFile = File(...)):
         file_path=str(saved_path),
         file_id=file_id,
         user_id="u123",
-        file_name=original_file_name
+        file_name=original_file_name,
+        category_id=category_id,
+        category_name=category_name
     )
     save_file_record(
         file_id=file_id,
         file_name=original_file_name,
         saved_path=str(saved_path),
-        user_id="u123"
+        user_id="u123",
+        category_id=category_id,
+        category_name=category_name
     )
 
     return {
@@ -69,10 +73,10 @@ async def delete_file_api(file_id: str):
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_api(request: QueryRequest):
-    return chat(request.query, request.file_ids)
+    return chat(request.query, request.file_ids, request.category_ids)
 
 @router.post("/get_chunk", response_model=list[SourceChunk])
 async def get_chunk_api(request: QueryRequest):
-    return get_chunk(request.query, request.file_ids)
+    return get_chunk(request.query, request.file_ids, request.category_ids)
 
 
