@@ -47,3 +47,4 @@ class ChatResponse(BaseModel):
     sources: list[SourceChunk]
     source_count: int
     selected_file_ids: list[str]
+

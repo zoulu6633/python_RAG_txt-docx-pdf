@@ -9,7 +9,7 @@ from langchain_community.vectorstores import Chroma
 from pathlib import Path
 from file_store import count_records_by_saved_path, delete_file_record, get_file_record
 from models import ChatResponse, ChunkRecord, ChunkMetadata, SourceChunk
-from llm import get_answer
+from llm import get_answer, stream_answer
 
 
 
@@ -206,6 +206,7 @@ def chat(query: str, file_ids: list[str] | None = None, category_ids: list[str] 
             source_count=0,
             selected_file_ids=selected_file_ids,
         )
+        return
 
     context = format_context(reranked_results)
     answer = get_answer(query, context)
@@ -259,8 +260,37 @@ def delete_document_assets(file_id: str) -> dict[str, object]:
         "deleted_physical_file": deleted_physical_file,
     }
 
+def chat_stream(query: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
+    retriever = build_retriever(file_ids, category_ids)
+    reranked_results = retriever.invoke(query)
+    sources = serialize_documents(reranked_results)
+    selected_file_ids = file_ids or []
 
+    if not sources:
+        yield {
+            "type": "done",
+            "answer": "在提供的文档中没有找到相关信息。",
+            "sources": [],
+            "source_count": 0,
+            "selected_file_ids": selected_file_ids,
+        }
+        return
 
+    context = format_context(reranked_results)
 
+    yield {
+    "type": "meta",
+    "source_count": len(sources),
+    "selected_file_ids": selected_file_ids,
+}
 
+    for chunk in stream_answer(query, context):
+        yield {
+            "type": "token",
+            "content": chunk,
+        }
 
+    yield {
+    "type": "done",
+    "sources": [item.model_dump() for item in sources],
+}

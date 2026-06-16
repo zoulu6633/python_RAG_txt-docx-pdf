@@ -979,6 +979,76 @@
       };
     }
 
+    function applyStreamEvent(event, requestConfig, streamState) {
+      if (!event || typeof event !== "object") {
+        return;
+      }
+
+      if (event.type === "meta") {
+        answerMeta.textContent = requestConfig.answerMetaText;
+        const sourceCount = Number(event.source_count || 0);
+        sourcesMeta.textContent = sourceCount > 0
+          ? `已检索到 ${sourceCount} 个相关片段，等待回答完成后展示`
+          : "未检索到相关片段";
+        return;
+      }
+
+      if (event.type === "token") {
+        const chunk = String(event.content || "");
+        streamState.answer += chunk;
+        answerBox.textContent = streamState.answer || "模型正在生成回答...";
+        answerMeta.textContent = `${requestConfig.answerMetaText}，正在流式生成`;
+        return;
+      }
+
+      if (event.type === "done") {
+        if (typeof event.answer === "string" && !streamState.answer) {
+          streamState.answer = event.answer;
+          answerBox.textContent = streamState.answer;
+        }
+
+        if (Array.isArray(event.sources)) {
+          renderSources(event.sources);
+          const finalSourceCount = typeof event.source_count === "number"
+            ? event.source_count
+            : event.sources.length;
+          sourcesMeta.textContent = finalSourceCount > 0
+            ? `共展示 ${finalSourceCount} 个相关参考片段`
+            : "暂无片段";
+        } else if (!streamState.answer) {
+          renderSources([]);
+        }
+
+        answerMeta.textContent = requestConfig.answerMetaText;
+        streamState.done = true;
+      }
+    }
+
+    function extractSseEvents(buffer) {
+      const segments = buffer.split("\n\n");
+      const remainder = segments.pop() || "";
+      const events = [];
+
+      segments.forEach((segment) => {
+        const lines = segment
+          .split("\n")
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trimStart());
+
+        if (lines.length === 0) {
+          return;
+        }
+
+        try {
+          events.push(JSON.parse(lines.join("\n")));
+        } catch (error) {
+          console.error("SSE 事件解析失败", error);
+        }
+      });
+
+      return { events, remainder };
+    }
+
     async function askQuestion() {
       const query = queryInput.value.trim();
       if (!query) {
@@ -998,28 +1068,78 @@
       answerBox.textContent = "正在生成回答...";
       answerMeta.textContent = "检索与生成中";
       sourcesBox.className = "empty";
-      sourcesBox.textContent = "正在整理参考片段...";
+      sourcesBox.textContent = "正在检索相关片段...";
       sourcesMeta.textContent = "处理中";
       setStatus(chatStatus, "正在检索并生成回答...");
 
       try {
-        const response = await fetch("/chat", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(requestConfig.payload)
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const streamState = {
+            answer: "",
+            done: false
+          };
+          let responseOffset = 0;
+          let buffer = "";
+
+          const processIncomingText = async (text) => {
+            if (!text) {
+              return;
+            }
+
+            buffer += text;
+            const parsed = extractSseEvents(buffer);
+            buffer = parsed.remainder;
+
+            parsed.events.forEach((event) => {
+              applyStreamEvent(event, requestConfig, streamState);
+            });
+
+            await new Promise((nextFrame) => requestAnimationFrame(nextFrame));
+          };
+
+          xhr.open("POST", "/chat/stream", true);
+          xhr.setRequestHeader("Content-Type", "application/json");
+          xhr.setRequestHeader("Accept", "text/event-stream");
+          xhr.setRequestHeader("Cache-Control", "no-cache");
+
+          xhr.onprogress = () => {
+            const nextText = xhr.responseText.slice(responseOffset);
+            responseOffset = xhr.responseText.length;
+            processIncomingText(nextText).catch(reject);
+          };
+
+          xhr.onload = () => {
+            if (xhr.status < 200 || xhr.status >= 300) {
+              reject(new Error(xhr.responseText || "问答请求失败"));
+              return;
+            }
+
+            const finalText = xhr.responseText.slice(responseOffset);
+            processIncomingText(finalText)
+              .then(() => {
+                if (!streamState.done) {
+                  reject(new Error("流式响应提前结束，请稍后重试。"));
+                  return;
+                }
+
+                if (!streamState.answer) {
+                  answerBox.textContent = "模型没有返回内容。";
+                }
+
+                resolve();
+              })
+              .catch(reject);
+          };
+
+          xhr.onerror = () => {
+            reject(new Error("流式连接失败，请检查网络或服务状态。"));
+          };
+
+          xhr.send(JSON.stringify(requestConfig.payload));
         });
 
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.detail || "问答请求失败");
-        }
-
-        answerBox.textContent = data.answer || "模型没有返回内容。";
-        answerMeta.textContent = requestConfig.answerMetaText;
-        renderSources(data.sources || []);
-        setStatus(chatStatus, `回答完成，共返回 ${data.source_count || 0} 个参考片段。`, "success");
+        setStatus(chatStatus, "回答完成，已通过流式方式返回结果。", "success");
       } catch (error) {
         answerBox.textContent = "请求失败，请检查后端服务和模型配置。";
         answerMeta.textContent = "请求失败";

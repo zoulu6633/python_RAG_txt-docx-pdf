@@ -1,11 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from fastapi import UploadFile, File
 from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
+import json
 from pathlib import Path
 import shutil
 from file_store import generate_file_id, init_file_db, list_file_records, save_file_record
 from models import ChatResponse, FileRecord, QueryRequest, SourceChunk
-from services import add_documents, chat, delete_document_assets, get_chunk
+from services import add_documents, chat, delete_document_assets, get_chunk, chat_stream
 
 router = APIRouter()
 BASE_DIR = Path(__file__).resolve().parent
@@ -78,5 +80,16 @@ async def chat_api(request: QueryRequest):
 @router.post("/get_chunk", response_model=list[SourceChunk])
 async def get_chunk_api(request: QueryRequest):
     return get_chunk(request.query, request.file_ids, request.category_ids)
+
+@router.post("/chat/stream")
+async def chat_stream_api(request: QueryRequest):
+    def event_generator():
+        for event in chat_stream(request.query, request.file_ids, request.category_ids):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream"
+    )
 
 
