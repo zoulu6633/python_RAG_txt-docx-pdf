@@ -426,6 +426,46 @@
       line-height: 1.8;
     }
 
+    .conversation-list {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+      max-height: 320px;
+      overflow: auto;
+    }
+
+    .message-card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px 16px;
+      background: #fcfdff;
+    }
+
+    .message-card.user {
+      background: #f5f9ff;
+      border-color: #bfd4ff;
+    }
+
+    .message-card.assistant {
+      background: #ffffff;
+    }
+
+    .message-role {
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1d4ed8;
+    }
+
+    .message-card.assistant .message-role {
+      color: #0f766e;
+    }
+
+    .message-content {
+      white-space: pre-wrap;
+      line-height: 1.8;
+    }
+
     .empty {
       padding: 18px 16px;
       color: var(--muted);
@@ -555,7 +595,7 @@
       <div class="panel">
         <div class="panel-header">
           <h2>问答区</h2>
-          <p>使用单次 `/chat` 请求返回答案和来源。按 `Ctrl + Enter` 也可以直接提问。</p>
+          <p>当前使用 `/chat/stream` 流式返回结果，并在前端保留最近几轮对话上下文。按 `Ctrl + Enter` 也可以直接提问。</p>
         </div>
         <div class="panel-body">
           <div class="field">
@@ -571,14 +611,25 @@
           <div class="field">
             <label for="queryInput">请输入你的问题</label>
             <textarea id="queryInput" placeholder="例如：文档中提到的机器学习三大范式是什么？"></textarea>
-            <div class="hint">检索时会自动使用当前分类作为 `category_ids`，并使用你勾选的文件作为 `file_ids`。如果两者都不选，则默认搜索全部文档。</div>
+            <div class="hint">检索时会自动使用当前分类作为 `category_ids`，并使用你勾选的文件作为 `file_ids`。当前页面会保留最近几轮问答，并通过 `history_messages` 一并发送给后端。</div>
           </div>
 
           <div class="row">
             <button id="askBtn" class="primary">开始提问</button>
             <button id="clearQuestionBtn" class="ghost" type="button">清空问题</button>
+            <button id="clearConversationBtn" class="ghost" type="button">清空会话</button>
           </div>
           <div id="chatStatus" class="status"></div>
+
+          <div class="field" style="margin-top: 22px;">
+            <div class="answer-shell">
+              <div class="section-head">
+                <strong>会话记录</strong>
+                <span class="section-meta" id="conversationMeta">最近 0 条消息</span>
+              </div>
+              <div id="conversationBox" class="empty">当前还没有会话记录，提问后会在这里保留最近几轮问答。</div>
+            </div>
+          </div>
 
           <div class="field" style="margin-top: 22px;">
             <div class="answer-shell">
@@ -610,6 +661,7 @@
 
   <script>
     const ALL_CATEGORY_VALUE = "__all__";
+    const MAX_HISTORY_MESSAGES = 12;
     const CATEGORY_OPTIONS = [
       { id: "study", name: "学习" },
       { id: "work", name: "工作" },
@@ -621,7 +673,8 @@
       categories: [],
       activeCategoryId: ALL_CATEGORY_VALUE,
       selectedFileIds: new Set(),
-      lastSourceCount: 0
+      lastSourceCount: 0,
+      historyMessages: []
     };
 
     const fileInput = document.getElementById("fileInput");
@@ -638,7 +691,10 @@
     const queryInput = document.getElementById("queryInput");
     const askBtn = document.getElementById("askBtn");
     const clearQuestionBtn = document.getElementById("clearQuestionBtn");
+    const clearConversationBtn = document.getElementById("clearConversationBtn");
     const chatStatus = document.getElementById("chatStatus");
+    const conversationBox = document.getElementById("conversationBox");
+    const conversationMeta = document.getElementById("conversationMeta");
     const answerBox = document.getElementById("answerBox");
     const answerMeta = document.getElementById("answerMeta");
     const sourcesBox = document.getElementById("sourcesBox");
@@ -752,6 +808,61 @@
 
     function getSelectedFileIds() {
       return Array.from(state.selectedFileIds);
+    }
+
+    function getConversationCount() {
+      return Math.floor(state.historyMessages.length / 2);
+    }
+
+    function renderConversation() {
+      if (!Array.isArray(state.historyMessages) || state.historyMessages.length === 0) {
+        conversationBox.className = "empty";
+        conversationBox.textContent = "当前还没有会话记录，提问后会在这里保留最近几轮问答。";
+        conversationMeta.textContent = "最近 0 条消息";
+        return;
+      }
+
+      conversationBox.className = "conversation-list";
+      conversationBox.innerHTML = state.historyMessages.map((message) => {
+        const role = message.role === "assistant" ? "assistant" : "user";
+        const roleLabel = role === "assistant" ? "助手" : "用户";
+        return `
+          <div class="message-card ${role}">
+            <div class="message-role">${roleLabel}</div>
+            <div class="message-content">${escapeHtml(message.content || "")}</div>
+          </div>
+        `;
+      }).join("");
+      conversationMeta.textContent = `最近 ${state.historyMessages.length} 条消息，约 ${getConversationCount()} 轮`;
+      conversationBox.scrollTop = conversationBox.scrollHeight;
+    }
+
+    function normalizeHistoryMessages(historyMessages) {
+      const normalized = Array.isArray(historyMessages)
+        ? historyMessages
+          .filter((item) => item && typeof item.content === "string")
+          .map((item) => ({
+            role: item.role === "assistant" ? "assistant" : "user",
+            content: item.content.trim()
+          }))
+          .filter((item) => item.content)
+        : [];
+
+      return normalized.slice(-MAX_HISTORY_MESSAGES);
+    }
+
+    function appendConversation(userContent, assistantContent) {
+      state.historyMessages = normalizeHistoryMessages([
+        ...state.historyMessages,
+        { role: "user", content: userContent },
+        { role: "assistant", content: assistantContent }
+      ]);
+      renderConversation();
+    }
+
+    function resetConversation() {
+      state.historyMessages = [];
+      renderConversation();
     }
 
     function renderCategories() {
@@ -959,6 +1070,7 @@
       const activeCategory = getActiveCategory();
       const categoryIds = activeCategory ? [activeCategory.id] : null;
       const fileIds = selectedIds.length > 0 ? selectedIds : null;
+      const historyMessages = normalizeHistoryMessages(state.historyMessages);
       let answerMetaText = "默认在全部文档中检索";
 
       if (categoryIds && fileIds) {
@@ -973,7 +1085,8 @@
         payload: {
           query,
           file_ids: fileIds,
-          category_ids: categoryIds
+          category_ids: categoryIds,
+          history_messages: historyMessages
         },
         answerMetaText
       };
@@ -1070,9 +1183,10 @@
       sourcesBox.className = "empty";
       sourcesBox.textContent = "正在检索相关片段...";
       sourcesMeta.textContent = "处理中";
-      setStatus(chatStatus, "正在检索并生成回答...");
+      setStatus(chatStatus, `正在检索并生成回答，将携带 ${requestConfig.payload.history_messages.length} 条历史消息...`);
 
       try {
+        let finalAnswer = "";
         await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           const streamState = {
@@ -1127,6 +1241,7 @@
                   answerBox.textContent = "模型没有返回内容。";
                 }
 
+                finalAnswer = streamState.answer.trim();
                 resolve();
               })
               .catch(reject);
@@ -1139,6 +1254,9 @@
           xhr.send(JSON.stringify(requestConfig.payload));
         });
 
+        if (finalAnswer) {
+          appendConversation(query, finalAnswer);
+        }
         setStatus(chatStatus, "回答完成，已通过流式方式返回结果。", "success");
       } catch (error) {
         answerBox.textContent = "请求失败，请检查后端服务和模型配置。";
@@ -1224,8 +1342,14 @@
       queryInput.value = "";
       queryInput.focus();
     });
+    clearConversationBtn.addEventListener("click", () => {
+      resetConversation();
+      setStatus(chatStatus, "会话记录已清空，后续提问将从空上下文开始。", "success");
+      queryInput.focus();
+    });
 
     updateStats();
+    renderConversation();
     loadFiles();
   </script>
 </body>

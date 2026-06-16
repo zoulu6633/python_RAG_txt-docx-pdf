@@ -9,7 +9,9 @@ class ChunkMetadata(BaseModel):
     category_id: str
     category_name: str
 
-
+class ChatMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
 
 class ChunkRecord(BaseModel):
     id: str
@@ -21,6 +23,7 @@ class QueryRequest(BaseModel):
     query: str
     file_ids: list[str] | None = None
     category_ids: list[str] | None = None
+    history_messages: list[ChatMessage] | None = None
 
 
 class FileRecord(BaseModel):

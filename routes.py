@@ -75,7 +75,7 @@ async def delete_file_api(file_id: str):
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_api(request: QueryRequest):
-    return chat(request.query, request.file_ids, request.category_ids)
+    return chat(request.query, request.file_ids, request.category_ids, request.history_messages)
 
 @router.post("/get_chunk", response_model=list[SourceChunk])
 async def get_chunk_api(request: QueryRequest):
@@ -84,7 +84,7 @@ async def get_chunk_api(request: QueryRequest):
 @router.post("/chat/stream")
 async def chat_stream_api(request: QueryRequest):
     def event_generator():
-        for event in chat_stream(request.query, request.file_ids, request.category_ids):
+        for event in chat_stream(request.query, request.file_ids, request.category_ids, request.history_messages):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
