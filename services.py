@@ -9,7 +9,7 @@ from langchain_community.vectorstores import Chroma
 from pathlib import Path
 from file_store import count_records_by_saved_path, delete_file_record, get_file_record
 from models import ChatResponse, ChunkRecord, ChunkMetadata, SourceChunk, ChatMessage
-from llm import get_answer, stream_answer
+from llm import get_answer, stream_answer, build_retrieval_queries
 
 
 
@@ -32,40 +32,86 @@ compressor = CrossEncoderReranker(
     model=rerank_model,
     top_n=5
 )
-def build_retriever(
+
+def build_search_kwargs(
     file_ids: list[str] | None = None,
     category_ids: list[str] | None = None
 ):
     search_kwargs = {"k": 10}
     filters = []
-    # 过滤文件
+
     if file_ids:
         if len(file_ids) == 1:
             filters.append({"file_id": file_ids[0]})
         else:
             filters.append({"file_id": {"$in": file_ids}})
-    # 过滤分类
+
     if category_ids:
         if len(category_ids) == 1:
             filters.append({"category_id": category_ids[0]})
         else:
             filters.append({"category_id": {"$in": category_ids}})
-    
+
     if len(filters) == 1:
         search_kwargs["filter"] = filters[0]
     elif len(filters) > 1:
         search_kwargs["filter"] = {"$and": filters}
-    # 向量库召回 top 10
+
+    return search_kwargs
+
+def build_retriever(
+    file_ids: list[str] | None = None,
+    category_ids: list[str] | None = None
+):
     base_retriever = vectorstore.as_retriever(
         search_type="similarity",
-        search_kwargs=search_kwargs
+        search_kwargs=build_search_kwargs(file_ids, category_ids)
     )
-    # 组合成最终检索器
-    retriever = ContextualCompressionRetriever(
-        base_compressor=compressor,
-        base_retriever=base_retriever
+
+    return base_retriever
+
+def deduplicate_documents(documents: list[Document]) -> list[Document]:
+    unique_documents: list[Document] = []
+    seen_keys: set[str] = set()
+
+    for document in documents:
+        metadata = document.metadata or {}
+        key = metadata.get("chunk_id") or f"{metadata.get('file_id', '')}:{document.page_content}"
+
+        if key in seen_keys:
+            continue
+
+        seen_keys.add(key)
+        unique_documents.append(document)
+
+    return unique_documents
+
+def retrieve_documents(
+    query: str,
+    file_ids: list[str] | None = None,
+    category_ids: list[str] | None = None,
+) -> list[Document]:
+    retriever = build_retriever(file_ids, category_ids)
+
+    search_queries = build_retrieval_queries(query)
+
+    candidates: list[Document] = []
+    for search_query in search_queries:
+        docs = retriever.invoke(search_query)
+        candidates.extend(docs)
+
+    unique_candidates = deduplicate_documents(candidates)
+    if not unique_candidates:
+        return []
+
+    # 用去重后的文档作为重排 query
+    rerank_query = search_queries[0] if search_queries else query
+    reranked_results = compressor.compress_documents(
+        unique_candidates,
+        query=rerank_query
     )
-    return retriever
+
+    return list(reranked_results)
 
 CHUNK_SIZE = 300
 CHUNK_OVERLAP = 80
@@ -194,8 +240,7 @@ def serialize_documents(documents: list[Document]) -> list[SourceChunk]:
     return serialized
 
 def chat(query: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None, history_messages: list[ChatMessage] | None = None):
-    retriever = build_retriever(file_ids, category_ids)
-    reranked_results = retriever.invoke(query)
+    reranked_results = retrieve_documents(query, file_ids, category_ids)
     sources = serialize_documents(reranked_results)
     selected_file_ids = file_ids or []
 
@@ -217,8 +262,7 @@ def chat(query: str, file_ids: list[str] | None = None, category_ids: list[str] 
     )
 
 def get_chunk(query: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
-    retriever = build_retriever(file_ids, category_ids)
-    retriever_results = retriever.invoke(query)
+    retriever_results = retrieve_documents(query, file_ids, category_ids)
     return serialize_documents(retriever_results)
 
 
@@ -260,8 +304,7 @@ def delete_document_assets(file_id: str) -> dict[str, object]:
     }
 
 def chat_stream(query: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None, history_messages: list[ChatMessage] | None = None):
-    retriever = build_retriever(file_ids, category_ids)
-    reranked_results = retriever.invoke(query)
+    reranked_results = retrieve_documents(query, file_ids, category_ids)
     sources = serialize_documents(reranked_results)
     selected_file_ids = file_ids or []
 
