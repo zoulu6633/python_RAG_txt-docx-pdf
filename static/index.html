@@ -367,13 +367,6 @@
       color: var(--muted);
     }
 
-    .answer-content {
-      min-height: 150px;
-      padding: 18px 16px;
-      white-space: pre-wrap;
-      line-height: 1.8;
-    }
-
     .sources-list {
       display: grid;
       gap: 14px;
@@ -430,7 +423,8 @@
       display: grid;
       gap: 12px;
       padding: 16px;
-      max-height: 320px;
+      min-height: 220px;
+      max-height: 520px;
       overflow: auto;
     }
 
@@ -464,6 +458,38 @@
     .message-content {
       white-space: pre-wrap;
       line-height: 1.8;
+    }
+
+    .chat-shell {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .chat-composer {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      background: #fbfdff;
+    }
+
+    .chat-composer textarea {
+      min-height: 110px;
+      margin-bottom: 12px;
+    }
+
+    .chat-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .chat-actions .hint {
+      flex: 1;
+      min-width: 260px;
+      margin-top: 0;
     }
 
     .empty {
@@ -608,36 +634,26 @@
             </div>
           </div>
 
-          <div class="field">
-            <label for="queryInput">请输入你的问题</label>
-            <textarea id="queryInput" placeholder="例如：文档中提到的机器学习三大范式是什么？"></textarea>
-            <div class="hint">检索时会自动使用当前分类作为 `category_ids`，并使用你勾选的文件作为 `file_ids`。当前页面会保留最近几轮问答，并通过 `history_messages` 一并发送给后端。</div>
-          </div>
-
-          <div class="row">
-            <button id="askBtn" class="primary">开始提问</button>
-            <button id="clearQuestionBtn" class="ghost" type="button">清空问题</button>
-            <button id="clearConversationBtn" class="ghost" type="button">清空会话</button>
-          </div>
-          <div id="chatStatus" class="status"></div>
-
           <div class="field" style="margin-top: 22px;">
-            <div class="answer-shell">
+            <div class="chat-shell">
               <div class="section-head">
-                <strong>会话记录</strong>
-                <span class="section-meta" id="conversationMeta">最近 0 条消息</span>
+                <strong>聊天对话框</strong>
+                <span class="section-meta" id="conversationMeta">等待提问</span>
               </div>
-              <div id="conversationBox" class="empty">当前还没有会话记录，提问后会在这里保留最近几轮问答。</div>
-            </div>
-          </div>
-
-          <div class="field" style="margin-top: 22px;">
-            <div class="answer-shell">
-              <div class="section-head">
-                <strong>回答结果</strong>
-                <span class="section-meta" id="answerMeta">等待提问</span>
+              <div id="conversationBox" class="empty">当前还没有会话记录，提问后会在这里按时间顺序展示用户问题和 AI 回答。</div>
+              <div class="chat-composer">
+                <label for="queryInput">请输入你的问题</label>
+                <textarea id="queryInput" placeholder="例如：文档中提到的机器学习三大范式是什么？"></textarea>
+                <div class="chat-actions">
+                  <div class="row">
+                    <button id="askBtn" class="primary">开始提问</button>
+                    <button id="clearQuestionBtn" class="ghost" type="button">清空问题</button>
+                    <button id="clearConversationBtn" class="ghost" type="button">清空会话</button>
+                  </div>
+                  <div class="hint">检索时会自动使用当前分类作为 `category_ids`，并使用你勾选的文件作为 `file_ids`。当前页面会保留最近几轮问答，并通过 `history_messages` 一并发送给后端。</div>
+                </div>
+                <div id="chatStatus" class="status"></div>
               </div>
-              <div id="answerBox" class="answer-content">提问后会在这里显示回答。</div>
             </div>
           </div>
 
@@ -674,7 +690,8 @@
       activeCategoryId: ALL_CATEGORY_VALUE,
       selectedFileIds: new Set(),
       lastSourceCount: 0,
-      historyMessages: []
+      historyMessages: [],
+      nextConversationRequestId: 0
     };
 
     const fileInput = document.getElementById("fileInput");
@@ -695,8 +712,6 @@
     const chatStatus = document.getElementById("chatStatus");
     const conversationBox = document.getElementById("conversationBox");
     const conversationMeta = document.getElementById("conversationMeta");
-    const answerBox = document.getElementById("answerBox");
-    const answerMeta = document.getElementById("answerMeta");
     const sourcesBox = document.getElementById("sourcesBox");
     const sourcesMeta = document.getElementById("sourcesMeta");
     const totalFilesStat = document.getElementById("totalFilesStat");
@@ -811,14 +826,14 @@
     }
 
     function getConversationCount() {
-      return Math.floor(state.historyMessages.length / 2);
+      return state.historyMessages.filter((message) => message.role === "user").length;
     }
 
     function renderConversation() {
       if (!Array.isArray(state.historyMessages) || state.historyMessages.length === 0) {
         conversationBox.className = "empty";
-        conversationBox.textContent = "当前还没有会话记录，提问后会在这里保留最近几轮问答。";
-        conversationMeta.textContent = "最近 0 条消息";
+        conversationBox.textContent = "当前还没有会话记录，提问后会在这里按时间顺序展示用户问题和 AI 回答。";
+        conversationMeta.textContent = "等待提问";
         return;
       }
 
@@ -843,7 +858,8 @@
           .filter((item) => item && typeof item.content === "string")
           .map((item) => ({
             role: item.role === "assistant" ? "assistant" : "user",
-            content: item.content.trim()
+            content: item.content.trim(),
+            requestId: item.requestId ?? null
           }))
           .filter((item) => item.content)
         : [];
@@ -851,12 +867,28 @@
       return normalized.slice(-MAX_HISTORY_MESSAGES);
     }
 
-    function appendConversation(userContent, assistantContent) {
-      state.historyMessages = normalizeHistoryMessages([
-        ...state.historyMessages,
-        { role: "user", content: userContent },
-        { role: "assistant", content: assistantContent }
-      ]);
+    function setStreamingConversation(userContent, assistantContent, requestId) {
+      const normalizedHistory = normalizeHistoryMessages(state.historyMessages);
+      const nextMessages = [...normalizedHistory];
+      const lastUser = nextMessages[nextMessages.length - 2];
+      const lastAssistant = nextMessages[nextMessages.length - 1];
+      const isLatestStreamingPair = lastUser
+        && lastAssistant
+        && lastUser.role === "user"
+        && lastAssistant.role === "assistant"
+        && lastUser.requestId === requestId
+        && lastAssistant.requestId === requestId;
+
+      if (isLatestStreamingPair) {
+        lastAssistant.content = assistantContent;
+      } else {
+        nextMessages.push(
+          { role: "user", content: userContent, requestId },
+          { role: "assistant", content: assistantContent, requestId }
+        );
+      }
+
+      state.historyMessages = normalizeHistoryMessages(nextMessages);
       renderConversation();
     }
 
@@ -1024,8 +1056,9 @@
 
         state.selectedFileIds.delete(fileId);
         state.lastSourceCount = 0;
-        answerBox.textContent = "提问后会在这里显示回答。";
-        answerMeta.textContent = "等待提问";
+        conversationMeta.textContent = state.historyMessages.length > 0
+          ? `最近 ${state.historyMessages.length} 条消息，约 ${getConversationCount()} 轮`
+          : "等待提问";
         sourcesBox.className = "empty";
         sourcesBox.textContent = "提问后会在这里展示命中的检索片段。";
         sourcesMeta.textContent = "暂无片段";
@@ -1070,7 +1103,11 @@
       const activeCategory = getActiveCategory();
       const categoryIds = activeCategory ? [activeCategory.id] : null;
       const fileIds = selectedIds.length > 0 ? selectedIds : null;
-      const historyMessages = normalizeHistoryMessages(state.historyMessages);
+      const historyMessages = normalizeHistoryMessages(state.historyMessages)
+        .map((item) => ({
+          role: item.role,
+          content: item.content
+        }));
       let answerMetaText = "默认在全部文档中检索";
 
       if (categoryIds && fileIds) {
@@ -1098,7 +1135,7 @@
       }
 
       if (event.type === "meta") {
-        answerMeta.textContent = requestConfig.answerMetaText;
+        conversationMeta.textContent = requestConfig.answerMetaText;
         const sourceCount = Number(event.source_count || 0);
         sourcesMeta.textContent = sourceCount > 0
           ? `已检索到 ${sourceCount} 个相关片段，等待回答完成后展示`
@@ -1109,15 +1146,15 @@
       if (event.type === "token") {
         const chunk = String(event.content || "");
         streamState.answer += chunk;
-        answerBox.textContent = streamState.answer || "模型正在生成回答...";
-        answerMeta.textContent = `${requestConfig.answerMetaText}，正在流式生成`;
+        setStreamingConversation(streamState.query, streamState.answer || "模型正在生成回答...", streamState.requestId);
+        conversationMeta.textContent = `${requestConfig.answerMetaText}，正在流式生成`;
         return;
       }
 
       if (event.type === "done") {
         if (typeof event.answer === "string" && !streamState.answer) {
           streamState.answer = event.answer;
-          answerBox.textContent = streamState.answer;
+          setStreamingConversation(streamState.query, streamState.answer, streamState.requestId);
         }
 
         if (Array.isArray(event.sources)) {
@@ -1132,7 +1169,8 @@
           renderSources([]);
         }
 
-        answerMeta.textContent = requestConfig.answerMetaText;
+        setStreamingConversation(streamState.query, streamState.answer || "模型没有返回内容。", streamState.requestId);
+        conversationMeta.textContent = requestConfig.answerMetaText;
         streamState.done = true;
       }
     }
@@ -1178,18 +1216,20 @@
       }
 
       askBtn.disabled = true;
-      answerBox.textContent = "正在生成回答...";
-      answerMeta.textContent = "检索与生成中";
+      const requestId = ++state.nextConversationRequestId;
+      setStreamingConversation(query, "模型正在生成回答...", requestId);
+      conversationMeta.textContent = "检索与生成中";
       sourcesBox.className = "empty";
       sourcesBox.textContent = "正在检索相关片段...";
       sourcesMeta.textContent = "处理中";
       setStatus(chatStatus, `正在检索并生成回答，将携带 ${requestConfig.payload.history_messages.length} 条历史消息...`);
 
       try {
-        let finalAnswer = "";
         await new Promise((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           const streamState = {
+            query,
+            requestId,
             answer: "",
             done: false
           };
@@ -1238,10 +1278,9 @@
                 }
 
                 if (!streamState.answer) {
-                  answerBox.textContent = "模型没有返回内容。";
+                  setStreamingConversation(query, "模型没有返回内容。", requestId);
                 }
 
-                finalAnswer = streamState.answer.trim();
                 resolve();
               })
               .catch(reject);
@@ -1254,13 +1293,10 @@
           xhr.send(JSON.stringify(requestConfig.payload));
         });
 
-        if (finalAnswer) {
-          appendConversation(query, finalAnswer);
-        }
         setStatus(chatStatus, "回答完成，已通过流式方式返回结果。", "success");
       } catch (error) {
-        answerBox.textContent = "请求失败，请检查后端服务和模型配置。";
-        answerMeta.textContent = "请求失败";
+        setStreamingConversation(query, "请求失败，请检查后端服务和模型配置。", requestId);
+        conversationMeta.textContent = "请求失败";
         renderSources([]);
         setStatus(chatStatus, error.message || "提问失败", "error");
       } finally {
