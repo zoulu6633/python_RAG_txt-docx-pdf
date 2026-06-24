@@ -21,9 +21,10 @@ class ChunkRecord(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str
+    session_id: str
+    user_id: str
     file_ids: list[str] | None = None
     category_ids: list[str] | None = None
-    history_messages: list[ChatMessage] | None = None
 
 
 class FileRecord(BaseModel):
@@ -47,6 +48,8 @@ class SourceChunk(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
+    session_id: str
+    user_id: str
     sources: list[SourceChunk]
     source_count: int
     selected_file_ids: list[str]

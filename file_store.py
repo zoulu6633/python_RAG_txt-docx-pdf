@@ -12,6 +12,7 @@ DB_PATH = BASE_DIR / "app.db"
 def _get_connection() -> sqlite3.Connection:
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 
@@ -40,8 +41,37 @@ def init_file_db() -> None:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                session_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(session_id) REFERENCES chat_sessions(session_id)
+            )
+            """
+        )
+        connection.execute(
+            """
             INSERT OR IGNORE INTO app_meta(key, value)
             VALUES ('file_seq', '0')
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_session_time
+            ON chat_messages(session_id, created_at);
             """
         )
         connection.commit()
@@ -147,3 +177,150 @@ def delete_file_record(file_id: str) -> bool:
         connection.commit()
 
     return cursor.rowcount > 0
+
+def create_chat_session(
+    session_id: str,
+    user_id: str,
+    title: str | None = None,
+) -> None:
+    init_file_db()
+    now = datetime.now(UTC).isoformat()
+
+    with _get_connection() as connection:
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO chat_sessions(session_id, user_id, title, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (session_id, user_id, title, now, now),
+        )
+        connection.commit()
+
+def get_chat_session(session_id: str) -> dict[str, str] | None:
+    init_file_db()
+
+    with _get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT session_id, user_id, title, created_at, updated_at
+            FROM chat_sessions
+            WHERE session_id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+def touch_chat_session(session_id: str, user_id: str) -> None:
+    init_file_db()
+    now = datetime.now(UTC).isoformat()
+
+    with _get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE chat_sessions
+            SET updated_at = ?
+            WHERE session_id = ?
+            AND user_id = ?
+            """,
+            (now, session_id, user_id),
+        )
+        connection.commit()
+    
+def save_chat_message(session_id: str, role: str, content: str) -> None:
+    init_file_db()
+    created_at = datetime.now(UTC).isoformat()
+
+    if role not in {"user", "assistant"}:
+        raise ValueError("role 必须是 user 或 assistant")
+        
+    with _get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO chat_messages(session_id, role, content, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (session_id, role, content, created_at),
+        )
+        connection.execute(
+            """
+            UPDATE chat_sessions
+            SET updated_at = ?
+            WHERE session_id = ?
+            """,
+            (created_at, session_id),
+        )
+        connection.commit()
+
+def list_recent_chat_messages(
+    session_id: str,
+    limit: int = 6,
+) -> list[dict[str, str]]:
+    init_file_db()
+
+    with _get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, session_id, role, content, created_at
+            FROM chat_messages
+            WHERE session_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (session_id, limit),
+        ).fetchall()
+
+    return [dict(row) for row in reversed(rows)]
+
+def ensure_chat_session(
+    session_id: str,
+    user_id: str,
+    title: str | None = None,
+) -> None:
+    init_file_db()
+
+    existing_session = get_chat_session(session_id)
+    if existing_session and existing_session["user_id"] != user_id:
+        raise ValueError("session_id 已被其他用户使用")
+
+    create_chat_session(
+        session_id=session_id,
+        user_id=user_id,
+        title=title,
+    )
+    return 
+
+def list_chat_sessions(user_id: str | None = None) -> list[dict[str, str]]:
+    init_file_db()
+
+    query = """
+        SELECT session_id, user_id, title, created_at, updated_at
+        FROM chat_sessions
+    """
+    params: tuple[str, ...] = ()
+
+    if user_id:
+        query += " WHERE user_id = ?"
+        params = (user_id,)
+
+    query += " ORDER BY updated_at DESC"
+
+    with _get_connection() as connection:
+        rows = connection.execute(query, params).fetchall()
+
+    return [dict(row) for row in rows]
+
+def delete_chat_messages(session_id: str) -> int:
+    init_file_db()
+
+    with _get_connection() as connection:
+        cursor = connection.execute(
+            """
+            DELETE FROM chat_messages
+            WHERE session_id = ?
+            """,
+            (session_id,),
+        )
+        connection.commit()
+
+    return cursor.rowcount

@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 import json
 from pathlib import Path
 import shutil
-from file_store import generate_file_id, init_file_db, list_file_records, save_file_record
+from file_store import generate_file_id, init_file_db, list_file_records, save_file_record, list_chat_sessions, list_recent_chat_messages, save_chat_message
 from models import ChatResponse, FileRecord, QueryRequest, SourceChunk
 from services import add_documents, chat, delete_document_assets, get_chunk, chat_stream
 
@@ -75,7 +75,7 @@ async def delete_file_api(file_id: str):
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_api(request: QueryRequest):
-    return chat(request.query, request.file_ids, request.category_ids, request.history_messages)
+    return chat(request.query, request.session_id, request.user_id, request.file_ids, request.category_ids)
 
 @router.post("/get_chunk", response_model=list[SourceChunk])
 async def get_chunk_api(request: QueryRequest):
@@ -84,7 +84,7 @@ async def get_chunk_api(request: QueryRequest):
 @router.post("/chat/stream")
 async def chat_stream_api(request: QueryRequest):
     def event_generator():
-        for event in chat_stream(request.query, request.file_ids, request.category_ids, request.history_messages):
+        for event in chat_stream(request.query, request.session_id, request.user_id, request.file_ids, request.category_ids):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
@@ -92,4 +92,15 @@ async def chat_stream_api(request: QueryRequest):
         media_type="text/event-stream"
     )
 
+@router.get("/chat/sessions")
+async def get_chat_sessions(user_id: str):
+    return list_chat_sessions(user_id)
+
+@router.get(f"/chat/sessions/{session_id}/{user_id}/messages")
+async def get_chat_session_messages(session_id: str, user_id: str, limit: int = 10):
+    sessions=list_chat_sessions(user_id)
+    session_ids = [s["session_id"] for s in sessions]
+    if session_id not in session_ids:
+        raise HTTPException(status_code=404, detail="session_id not found")
+    return list_recent_chat_messages(session_id, limit)
 

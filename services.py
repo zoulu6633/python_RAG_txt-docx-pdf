@@ -7,7 +7,7 @@ from langchain_classic.retrievers.contextual_compression import ContextualCompre
 from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.vectorstores import Chroma
 from pathlib import Path
-from file_store import count_records_by_saved_path, delete_file_record, get_file_record
+from file_store import count_records_by_saved_path, delete_file_record, get_file_record, save_chat_message, list_recent_chat_messages, ensure_chat_session, list_chat_sessions, delete_chat_messages    
 from models import ChatResponse, ChunkRecord, ChunkMetadata, SourceChunk, ChatMessage
 from llm import get_answer, stream_answer, build_retrieval_queries
 
@@ -90,10 +90,11 @@ def retrieve_documents(
     query: str,
     file_ids: list[str] | None = None,
     category_ids: list[str] | None = None,
+    history_messages: list[ChatMessage] | None = None
 ) -> list[Document]:
     retriever = build_retriever(file_ids, category_ids)
 
-    search_queries = build_retrieval_queries(query)
+    search_queries = build_retrieval_queries(query, history_messages)
 
     candidates: list[Document] = []
     for search_query in search_queries:
@@ -239,24 +240,39 @@ def serialize_documents(documents: list[Document]) -> list[SourceChunk]:
 
     return serialized
 
-def chat(query: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None, history_messages: list[ChatMessage] | None = None):
-    reranked_results = retrieve_documents(query, file_ids, category_ids)
+def chat(query: str, session_id: str, user_id: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
+    ensure_chat_session(session_id, user_id)
+    stored_messages = list_recent_chat_messages(session_id, limit=10)
+    history_messages = [
+    ChatMessage(role=item["role"], content=item["content"])
+    for item in stored_messages
+    ]
+    reranked_results = retrieve_documents(query, file_ids, category_ids, history_messages)
     sources = serialize_documents(reranked_results)
     selected_file_ids = file_ids or []
 
     if not sources:
+        save_chat_message(session_id, "user", query)
+        save_chat_message(session_id, "assistant", "在提供的文档中没有找到相关信息。")
         return ChatResponse(
             answer="在提供的文档中没有找到相关信息。",
             sources=[],
+            session_id=session_id,
+            user_id=user_id,
             source_count=0,
             selected_file_ids=selected_file_ids,
         )
 
     context = format_context(reranked_results)
+    
     answer = get_answer(query, context, history_messages)
+    save_chat_message(session_id, "user", query)
+    save_chat_message(session_id, "assistant", answer)
     return ChatResponse(
         answer=answer,
         sources=sources,
+        session_id=session_id,
+        user_id=user_id,
         source_count=len(sources),
         selected_file_ids=selected_file_ids,
     )
@@ -303,15 +319,26 @@ def delete_document_assets(file_id: str) -> dict[str, object]:
         "deleted_physical_file": deleted_physical_file,
     }
 
-def chat_stream(query: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None, history_messages: list[ChatMessage] | None = None):
-    reranked_results = retrieve_documents(query, file_ids, category_ids)
+def chat_stream(query: str, session_id: str, user_id: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
+    ensure_chat_session(session_id, user_id)
+    stored_messages = list_recent_chat_messages(session_id, limit=10)
+    history_messages = [
+    ChatMessage(role=item["role"], content=item["content"])
+    for item in stored_messages
+    ]
+    reranked_results = retrieve_documents(query, file_ids, category_ids, history_messages)
     sources = serialize_documents(reranked_results)
     selected_file_ids = file_ids or []
 
     if not sources:
+        fallback_answer = "在提供的文档中没有找到相关信息。"
+        save_chat_message(session_id, "user", query)
+        save_chat_message(session_id, "assistant", fallback_answer)
         yield {
             "type": "done",
-            "answer": "在提供的文档中没有找到相关信息。",
+            "answer": fallback_answer,
+            "session_id": session_id,
+            "user_id": user_id,
             "sources": [],
             "source_count": 0,
             "selected_file_ids": selected_file_ids,
@@ -320,19 +347,27 @@ def chat_stream(query: str, file_ids: list[str] | None = None, category_ids: lis
 
     context = format_context(reranked_results)
 
+
     yield {
     "type": "meta",
+    "session_id": session_id,
+    "user_id": user_id,
     "source_count": len(sources),
     "selected_file_ids": selected_file_ids,
 }
-
+    
+    answer=[]
     for chunk in stream_answer(query, context, history_messages):
+        answer.append(chunk)
         yield {
             "type": "token",
             "content": chunk,
         }
-
+    final_answer = "".join(answer).strip()
+    save_chat_message(session_id, "user", query)
+    save_chat_message(session_id, "assistant", final_answer)
     yield {
     "type": "done",
     "sources": [item.model_dump() for item in sources],
 }
+
