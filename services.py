@@ -247,27 +247,36 @@ def chat(query: str, session_id: str, user_id: str, file_ids: list[str] | None =
     ChatMessage(role=item["role"], content=item["content"])
     for item in stored_messages
     ]
-    reranked_results = retrieve_documents(query, file_ids, category_ids, history_messages)
-    sources = serialize_documents(reranked_results)
-    selected_file_ids = file_ids or []
-
-    if not sources:
-        save_chat_message(session_id, "user", query)
-        save_chat_message(session_id, "assistant", "在提供的文档中没有找到相关信息。")
-        return ChatResponse(
-            answer="在提供的文档中没有找到相关信息。",
-            sources=[],
-            session_id=session_id,
-            user_id=user_id,
-            source_count=0,
-            selected_file_ids=selected_file_ids,
-        )
-
-    context = format_context(reranked_results)
-    
-    answer = get_answer(query, context, history_messages)
+    # 先保存用户消息，避免模型调用失败时整轮丢失
     save_chat_message(session_id, "user", query)
-    save_chat_message(session_id, "assistant", answer)
+    try:
+    
+        reranked_results = retrieve_documents(query, file_ids, category_ids, history_messages)
+        sources = serialize_documents(reranked_results)
+        selected_file_ids = file_ids or []
+
+        if not sources:
+            save_chat_message(session_id, "assistant", "在提供的文档中没有找到相关信息。")
+            return ChatResponse(
+                answer="在提供的文档中没有找到相关信息。",
+                sources=[],
+                session_id=session_id,
+                user_id=user_id,
+                source_count=0,
+                selected_file_ids=selected_file_ids,
+            )
+
+        context = format_context(reranked_results)
+    
+        answer = get_answer(query, context, history_messages)
+        if not answer:
+            answer = "在提供的文档中没有找到相关信息。"
+        save_chat_message(session_id, "assistant", answer)
+    except Exception:
+        save_chat_message(session_id, "assistant", "请求失败，请检查模型配置或稍后重试。")
+        raise
+    
+
     return ChatResponse(
         answer=answer,
         sources=sources,
@@ -326,46 +335,54 @@ def chat_stream(query: str, session_id: str, user_id: str, file_ids: list[str] |
     ChatMessage(role=item["role"], content=item["content"])
     for item in stored_messages
     ]
-    reranked_results = retrieve_documents(query, file_ids, category_ids, history_messages)
-    sources = serialize_documents(reranked_results)
-    selected_file_ids = file_ids or []
-
-    if not sources:
-        fallback_answer = "在提供的文档中没有找到相关信息。"
-        save_chat_message(session_id, "user", query)
-        save_chat_message(session_id, "assistant", fallback_answer)
-        yield {
-            "type": "done",
-            "answer": fallback_answer,
-            "session_id": session_id,
-            "user_id": user_id,
-            "sources": [],
-            "source_count": 0,
-            "selected_file_ids": selected_file_ids,
-        }
-        return
-
-    context = format_context(reranked_results)
-
-
-    yield {
-    "type": "meta",
-    "session_id": session_id,
-    "user_id": user_id,
-    "source_count": len(sources),
-    "selected_file_ids": selected_file_ids,
-}
-    
-    answer=[]
-    for chunk in stream_answer(query, context, history_messages):
-        answer.append(chunk)
-        yield {
-            "type": "token",
-            "content": chunk,
-        }
-    final_answer = "".join(answer).strip()
+    # 先保存用户消息，避免模型调用失败时整轮丢失
     save_chat_message(session_id, "user", query)
-    save_chat_message(session_id, "assistant", final_answer)
+    try:
+        reranked_results = retrieve_documents(query, file_ids, category_ids, history_messages)
+        sources = serialize_documents(reranked_results)
+        selected_file_ids = file_ids or []
+
+        if not sources:
+            fallback_answer = "在提供的文档中没有找到相关信息。"
+            save_chat_message(session_id, "assistant", fallback_answer)
+            yield {
+                "type": "done",
+                "answer": fallback_answer,
+                "session_id": session_id,
+                "user_id": user_id,
+                "sources": [],
+                "source_count": 0,
+                "selected_file_ids": selected_file_ids,
+            }
+            return
+
+        context = format_context(reranked_results)
+
+        yield {
+        "type": "meta",
+        "session_id": session_id,
+        "user_id": user_id,
+        "source_count": len(sources),
+        "selected_file_ids": selected_file_ids,
+    }
+        
+        answer=[]
+
+        for chunk in stream_answer(query, context, history_messages):
+            answer.append(chunk)
+            yield {
+                "type": "token",
+                "content": chunk,
+            }
+        final_answer = "".join(answer).strip()
+        if not final_answer:
+            final_answer = "在提供的文档中没有找到相关信息。"
+        save_chat_message(session_id, "assistant", final_answer)
+
+    except Exception:
+        save_chat_message(session_id, "assistant", "请求失败，请检查模型配置或稍后重试。")
+        raise
+    
     yield {
     "type": "done",
     "sources": [item.model_dump() for item in sources],

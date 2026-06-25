@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 import json
 from pathlib import Path
 import shutil
-from file_store import generate_file_id, init_file_db, list_file_records, save_file_record, list_chat_sessions, list_recent_chat_messages, save_chat_message
+from file_store import generate_file_id, get_file_record, init_file_db, list_file_records, save_file_record, list_chat_sessions, list_recent_chat_messages, save_chat_message
 from models import ChatResponse, FileRecord, QueryRequest, SourceChunk
 from services import add_documents, chat, delete_document_assets, get_chunk, chat_stream
 
@@ -14,6 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 STATIC_DIR = BASE_DIR / "static"
 FRONTEND_FILE = STATIC_DIR / "index.html"
+LIBRARY_FRONTEND_FILE = STATIC_DIR / "library.html"
 UPLOAD_DIR.mkdir(exist_ok=True)
 STATIC_DIR.mkdir(exist_ok=True)
 init_file_db()
@@ -23,6 +24,12 @@ async def root():
     if FRONTEND_FILE.exists():
         return FileResponse(FRONTEND_FILE)
     return {"message": "RAG frontend is not ready yet."}
+
+@router.get("/library")
+async def library_page():
+    if LIBRARY_FRONTEND_FILE.exists():
+        return FileResponse(LIBRARY_FRONTEND_FILE)
+    return {"message": "RAG library frontend is not ready yet."}
     
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...), category_id: str = "student", category_name: str = "学习"):
@@ -66,6 +73,19 @@ async def get_files(user_id: str | None = None):
     return list_file_records(user_id)
 
 
+@router.get("/files/{file_id}/view")
+async def view_file(file_id: str):
+    file_record = get_file_record(file_id)
+    if not file_record:
+        raise HTTPException(status_code=404, detail="file_id not found")
+
+    saved_path = Path(file_record["saved_path"])
+    if not saved_path.exists():
+        raise HTTPException(status_code=404, detail="file not found")
+
+    return FileResponse(saved_path, filename=file_record["file_name"])
+
+
 @router.delete("/files/{file_id}")
 async def delete_file_api(file_id: str):
     result = delete_document_assets(file_id)
@@ -96,7 +116,7 @@ async def chat_stream_api(request: QueryRequest):
 async def get_chat_sessions(user_id: str):
     return list_chat_sessions(user_id)
 
-@router.get(f"/chat/sessions/{session_id}/{user_id}/messages")
+@router.get("/chat/sessions/{session_id}/{user_id}/messages")
 async def get_chat_session_messages(session_id: str, user_id: str, limit: int = 10):
     sessions=list_chat_sessions(user_id)
     session_ids = [s["session_id"] for s in sessions]

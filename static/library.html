@@ -135,6 +135,10 @@
       line-height: 1.7;
     }
 
+    input[type="search"]::-webkit-search-cancel-button {
+      cursor: pointer;
+    }
+
     .page {
       height: 100vh;
       display: flex;
@@ -427,6 +431,165 @@
       flex-wrap: wrap;
     }
 
+    .upload-shell {
+      display: block;
+    }
+
+    .upload-inline {
+      display: grid;
+      grid-template-columns: minmax(260px, 1.6fr) minmax(120px, 0.5fr) auto;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .upload-card {
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .upload-card-title {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #163a76;
+    }
+
+    .upload-card .field {
+      gap: 6px;
+    }
+
+    .upload-card .field label {
+      font-size: 13px;
+    }
+
+    .upload-card .field:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .upload-card .row {
+      flex-wrap: nowrap;
+      justify-content: flex-end;
+    }
+
+    .upload-card .row button {
+      white-space: nowrap;
+    }
+
+    .file-input-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .selected-file-name {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: #183f96;
+      font-size: 12px;
+      font-weight: 700;
+      max-width: 100%;
+      word-break: break-word;
+    }
+
+    .summary-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px 14px;
+      border: 1px solid #cfe0ff;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #f7faff 0%, #edf4ff 100%);
+      color: #173b75;
+      line-height: 1.6;
+    }
+
+    .summary-banner strong {
+      font-size: 14px;
+    }
+
+    .summary-banner span {
+      font-size: 13px;
+      color: #3c5d8a;
+    }
+
+    .list-tools {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .search-field {
+      width: 100%;
+    }
+
+    .selection-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .selection-badge.active {
+      background: var(--primary-soft);
+      color: #183f96;
+    }
+
+    .file-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .file-tag-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .meta-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      color: #475569;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .meta-chip.category {
+      background: #eef4ff;
+      color: #183f96;
+      border-color: #cfe0ff;
+    }
+
+    .file-desc-grid {
+      display: grid;
+      gap: 6px;
+    }
+
     .chat-workspace {
       flex: 1;
       min-height: 0;
@@ -450,17 +613,18 @@
     }
 
     .library-layout .panel-body {
-      overflow: hidden;
+      overflow: auto;
     }
 
     .library-file-section {
       flex: 1;
-      min-height: 0;
-      overflow: hidden;
+      min-height: 480px;
+      overflow: visible;
     }
 
     .library-file-section .file-list {
       flex: 1;
+      min-height: 420px;
       max-height: none;
     }
 
@@ -552,13 +716,6 @@
       font-size: 12px;
       line-height: 1.6;
       color: var(--muted);
-    }
-
-    .chat-meta-stack {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 6px;
     }
 
     .chat-content {
@@ -843,6 +1000,19 @@
         grid-template-columns: 1fr;
       }
 
+      .upload-shell {
+        display: block;
+      }
+
+      .upload-inline {
+        grid-template-columns: 1fr;
+      }
+
+      .upload-card .row {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+      }
+
       .file-list,
       .session-list {
         max-height: 280px;
@@ -866,6 +1036,10 @@
         grid-template-columns: 1fr;
       }
 
+      .list-tools {
+        grid-template-columns: 1fr;
+      }
+
       .composer-input-row {
         flex-direction: column;
         align-items: stretch;
@@ -874,14 +1048,6 @@
       .composer-input-row .primary {
         width: 100%;
       }
-
-      .chat-header {
-        flex-direction: column;
-      }
-
-      .chat-meta-stack {
-        align-items: flex-start;
-      }
     }
   </style>
 </head>
@@ -889,11 +1055,11 @@
   <div class="page">
     <section class="topbar">
       <div class="topbar-main">
-        <h1>RAG 文档问答系统</h1>
-        <p>聊天页专注提问和追问，资料范围可在独立资料库页面中单独维护。</p>
+        <h1>RAG 资料库管理</h1>
+        <p>资料库页专注文件上传、分类与检索范围维护，勾选结果会自动同步到聊天页。</p>
         <div class="app-switch">
-          <button id="chatViewBtn" class="secondary switch-button active" type="button">聊天</button>
-          <button id="libraryViewBtn" class="ghost switch-button" type="button">资料库</button>
+          <button id="chatViewBtn" class="ghost switch-button" type="button">聊天</button>
+          <button id="libraryViewBtn" class="secondary switch-button active" type="button">资料库</button>
         </div>
       </div>
       <div class="stats">
@@ -906,14 +1072,14 @@
           <div id="selectedFilesStat" class="stat-value">0</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">最近命中片段</div>
+          <div class="stat-label">当前分类数</div>
           <div id="sourceCountStat" class="stat-value">0</div>
         </div>
       </div>
     </section>
 
     <section class="workspace">
-      <section id="chatView" class="view">
+      <section id="chatView" class="view hidden">
         <section class="chat-workspace">
           <aside class="panel session-panel">
             <div class="panel-header">
@@ -939,10 +1105,7 @@
                 <h2>聊天窗口</h2>
                 <p>围绕当前会话连续追问，答案会自动结合你勾选的知识库范围。</p>
               </div>
-              <div class="chat-meta-stack">
-                <div id="scopeSummary" class="hint">当前范围：全部文档</div>
-                <div id="conversationMeta" class="section-meta">请选择或新建会话</div>
-              </div>
+              <div id="conversationMeta" class="section-meta">请选择或新建会话</div>
             </div>
 
             <div class="chat-content">
@@ -970,6 +1133,87 @@
         </section>
       </section>
 
+      <section id="libraryView" class="view">
+        <section class="library-layout">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>资料库</h2>
+              <p>建议先完成上传与分类，再勾选聊天要检索的文件范围；这些设置会自动带回聊天页。</p>
+            </div>
+            <div class="panel-body">
+              <div class="upload-shell">
+                <div class="upload-card">
+                  <div class="upload-card-title">上传新文档</div>
+                  <div class="upload-inline">
+                    <div class="field">
+                      <label for="fileInput">上传文档</label>
+                      <input id="fileInput" type="file" accept=".txt,.pdf,.docx">
+                      <div class="file-input-meta">
+                        <div class="hint">支持 `txt`、`pdf`、`docx`。</div>
+                        <div id="selectedFileHint" class="selected-file-name">未选择文件</div>
+                      </div>
+                    </div>
+
+                    <div class="field">
+                      <label for="categorySelect">上传分类</label>
+                      <select id="categorySelect">
+                        <option value="study">学习</option>
+                        <option value="work">工作</option>
+                        <option value="life">生活</option>
+                      </select>
+                    </div>
+
+                    <div class="field">
+                      <label>&nbsp;</label>
+                      <div class="row">
+                        <button id="uploadBtn" class="primary" type="button">上传并入库</button>
+                        <button id="refreshBtn" class="secondary" type="button">刷新列表</button>
+                        <button id="backToChatBtn" class="ghost" type="button">返回聊天页</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div id="uploadStatus" class="status"></div>
+                </div>
+              </div>
+
+              <div id="scopeBanner" class="summary-banner">
+                <strong>当前检索范围：全部文档</strong>
+                <span>还没有额外的分类或文件限制。</span>
+              </div>
+
+              <div class="field">
+                <div class="toolbar">
+                  <label style="margin: 0;">分类筛选</label>
+                  <div id="activeCategorySummary" class="count">当前：全部分类</div>
+                </div>
+                <div id="categoryList" class="chip-group">
+                  <button class="chip active" type="button">全部分类</button>
+                </div>
+              </div>
+
+              <div class="field library-file-section">
+                <div class="toolbar">
+                  <label style="margin: 0;">文件列表</label>
+                  <div id="selectionBadge" class="selection-badge">已勾选 0 个文件</div>
+                </div>
+                <div class="list-tools">
+                  <div class="search-field">
+                    <input id="fileSearchInput" type="search" placeholder="搜索文件名、分类或文件 ID">
+                  </div>
+                  <div class="row">
+                    <button id="selectAllBtn" class="ghost" type="button">全选</button>
+                    <button id="clearSelectionBtn" class="ghost" type="button">清空</button>
+                  </div>
+                </div>
+                <div id="selectionSummary" class="count">已选 0 / 0</div>
+                <div id="fileList" class="file-list">
+                  <div class="empty">正在加载文件列表...</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
     </section>
   </div>
 
@@ -1007,11 +1251,12 @@
     const persistedScope = loadSelectionScope();
 
     const state = {
-      currentView: "chat",
+      currentView: "library",
       files: [],
       categories: [],
       activeCategoryId: persistedScope.activeCategoryId,
       selectedFileIds: new Set(persistedScope.selectedFileIds),
+      searchKeyword: "",
       sessions: [],
       activeSessionId: "",
       sessionMessages: [],
@@ -1038,12 +1283,30 @@
       }
     ];
 
+    const fileInput = document.getElementById("fileInput");
+    const categorySelect = document.getElementById("categorySelect");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const selectAllBtn = document.getElementById("selectAllBtn");
+    const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+    const uploadStatus = document.getElementById("uploadStatus");
+    const categoryList = document.getElementById("categoryList");
+    const activeCategorySummary = document.getElementById("activeCategorySummary");
+    const fileList = document.getElementById("fileList");
+    const selectionSummary = document.getElementById("selectionSummary");
+    const selectionBadge = document.getElementById("selectionBadge");
+    const fileSearchInput = document.getElementById("fileSearchInput");
+    const selectedFileHint = document.getElementById("selectedFileHint");
+    const scopeBanner = document.getElementById("scopeBanner");
     const totalFilesStat = document.getElementById("totalFilesStat");
     const selectedFilesStat = document.getElementById("selectedFilesStat");
     const sourceCountStat = document.getElementById("sourceCountStat");
+    const chatView = document.getElementById("chatView");
+    const libraryView = document.getElementById("libraryView");
     const chatViewBtn = document.getElementById("chatViewBtn");
     const libraryViewBtn = document.getElementById("libraryViewBtn");
     const openLibraryBtn = document.getElementById("openLibraryBtn");
+    const backToChatBtn = document.getElementById("backToChatBtn");
 
     const newSessionBtn = document.getElementById("newSessionBtn");
     const refreshSessionsBtn = document.getElementById("refreshSessionsBtn");
@@ -1052,7 +1315,6 @@
 
     const conversationBox = document.getElementById("conversationBox");
     const conversationMeta = document.getElementById("conversationMeta");
-    const scopeSummary = document.getElementById("scopeSummary");
     const queryInput = document.getElementById("queryInput");
     const askBtn = document.getElementById("askBtn");
     const chatStatus = document.getElementById("chatStatus");
@@ -1060,6 +1322,20 @@
     function setStatus(element, message, type) {
       element.textContent = message || "";
       element.className = type ? `status ${type}` : "status";
+    }
+
+    function switchView(viewName) {
+      state.currentView = viewName === "library" ? "library" : "chat";
+      const isLibraryView = state.currentView === "library";
+
+      chatView.classList.toggle("hidden", isLibraryView);
+      libraryView.classList.toggle("hidden", !isLibraryView);
+      chatViewBtn.classList.toggle("active", !isLibraryView);
+      libraryViewBtn.classList.toggle("active", isLibraryView);
+      chatViewBtn.classList.toggle("secondary", !isLibraryView);
+      chatViewBtn.classList.toggle("ghost", isLibraryView);
+      libraryViewBtn.classList.toggle("secondary", isLibraryView);
+      libraryViewBtn.classList.toggle("ghost", !isLibraryView);
     }
 
     function escapeHtml(value) {
@@ -1125,6 +1401,82 @@
       return state.categories.find((category) => category.id === state.activeCategoryId) || null;
     }
 
+    function getVisibleFiles() {
+      if (state.activeCategoryId === ALL_CATEGORY_VALUE) {
+        return state.files;
+      }
+      return state.files.filter((file) => normalizeCategory(file).id === state.activeCategoryId);
+    }
+
+    function matchesSearchKeyword(file, keyword) {
+      if (!keyword) {
+        return true;
+      }
+
+      const category = normalizeCategory(file);
+      const haystack = [
+        file.file_name,
+        file.file_id,
+        category.name,
+        category.id
+      ]
+        .map((item) => String(item || "").toLowerCase())
+        .join(" ");
+
+      return haystack.includes(keyword);
+    }
+
+    function getFilteredFiles() {
+      const keyword = state.searchKeyword.trim().toLowerCase();
+      return getVisibleFiles().filter((file) => matchesSearchKeyword(file, keyword));
+    }
+
+    function getSelectedVisibleFileIds() {
+      const visibleIds = new Set(getVisibleFiles().map((file) => file.file_id));
+      return getSelectedFileIds().filter((fileId) => visibleIds.has(fileId));
+    }
+
+    function getSelectedFilteredFileIds() {
+      const filteredIds = new Set(getFilteredFiles().map((file) => file.file_id));
+      return getSelectedFileIds().filter((fileId) => filteredIds.has(fileId));
+    }
+
+    function updateSelectedFileHint() {
+      const currentFile = fileInput.files && fileInput.files[0];
+      selectedFileHint.textContent = currentFile ? `已选：${currentFile.name}` : "未选择文件";
+    }
+
+    function buildScopeBannerContent() {
+      const activeCategory = getActiveCategory();
+      const selectedCount = state.selectedFileIds.size;
+
+      if (activeCategory && selectedCount > 0) {
+        return {
+          title: `当前检索范围：${activeCategory.name}分类 + ${selectedCount} 个已勾选文件`,
+          detail: "聊天时会同时应用分类筛选和文件勾选范围。"
+        };
+      }
+
+      if (activeCategory) {
+        return {
+          title: `当前检索范围：${activeCategory.name}分类全部文件`,
+          detail: "未单独勾选文件，聊天时将检索该分类下所有文档。"
+        };
+      }
+
+      if (selectedCount > 0) {
+        return {
+          title: `当前检索范围：${selectedCount} 个已勾选文件`,
+          detail: "未限制分类，聊天时只会检索这些被勾选的文档。"
+        };
+      }
+
+      return {
+        title: "当前检索范围：全部文档",
+        detail: "还没有额外的分类或文件限制。"
+      };
+    }
+
     function rebuildCategories() {
       const categories = new Map(
         CATEGORY_OPTIONS.map((category) => [
@@ -1149,35 +1501,38 @@
       }
     }
 
-    function buildScopeSummaryText() {
-      const activeCategory = getActiveCategory();
-      const selectedCount = state.selectedFileIds.size;
-
-      if (activeCategory && selectedCount > 0) {
-        return `当前范围：${activeCategory.name}分类，已勾选 ${selectedCount} 个文件`;
-      }
-
-      if (activeCategory) {
-        return `当前范围：${activeCategory.name}分类下全部文件`;
-      }
-
-      if (selectedCount > 0) {
-        return `当前范围：已勾选 ${selectedCount} 个文件`;
-      }
-
-      return "当前范围：全部文档";
-    }
-
     function updateStats() {
       totalFilesStat.textContent = String(state.files.length);
       selectedFilesStat.textContent = String(state.selectedFileIds.size);
-      sourceCountStat.textContent = String(state.lastSourceCount);
+      sourceCountStat.textContent = String(state.categories.length);
 
+      const visibleFiles = getVisibleFiles();
+      const filteredFiles = getFilteredFiles();
       const activeCategory = getActiveCategory();
+      const selectedVisibleCount = getSelectedVisibleFileIds().length;
+      const selectedFilteredCount = getSelectedFilteredFileIds().length;
+      const scopeBannerContent = buildScopeBannerContent();
 
-      if (scopeSummary) {
-        scopeSummary.textContent = buildScopeSummaryText();
+      if (activeCategory) {
+        selectionSummary.textContent = state.searchKeyword
+          ? `当前分类 ${visibleFiles.length} 个文件，搜索结果 ${filteredFiles.length} 个，其中已选 ${selectedFilteredCount} 个`
+          : `当前分类 ${visibleFiles.length} 个文件，已选 ${selectedVisibleCount} 个`;
+      } else {
+        selectionSummary.textContent = state.searchKeyword
+          ? `全部文件 ${state.files.length} 个，搜索结果 ${filteredFiles.length} 个，其中已选 ${selectedFilteredCount} 个`
+          : `已选 ${state.selectedFileIds.size} / ${state.files.length}`;
       }
+
+      activeCategorySummary.textContent = activeCategory
+        ? `当前：${activeCategory.name}（${activeCategory.count}）`
+        : `当前：全部分类（${state.files.length}）`;
+
+      selectionBadge.textContent = `已勾选 ${state.selectedFileIds.size} 个文件`;
+      selectionBadge.classList.toggle("active", state.selectedFileIds.size > 0);
+      scopeBanner.innerHTML = `
+        <strong>${escapeHtml(scopeBannerContent.title)}</strong>
+        <span>${escapeHtml(scopeBannerContent.detail)}</span>
+      `;
 
       saveSelectionScope();
     }
@@ -1279,6 +1634,102 @@
           `).join("")}
         </div>
       `;
+    }
+
+    function renderCategories() {
+      const buttons = [
+        `
+          <button
+            class="chip ${state.activeCategoryId === ALL_CATEGORY_VALUE ? "active" : ""}"
+            type="button"
+            data-category-id="${ALL_CATEGORY_VALUE}"
+          >
+            全部分类 (${state.files.length})
+          </button>
+        `
+      ];
+
+      state.categories.forEach((category) => {
+        buttons.push(`
+          <button
+            class="chip ${state.activeCategoryId === category.id ? "active" : ""}"
+            type="button"
+            data-category-id="${escapeHtml(category.id)}"
+          >
+            ${escapeHtml(category.name)} (${category.count})
+          </button>
+        `);
+      });
+
+      categoryList.innerHTML = buttons.join("");
+      updateStats();
+    }
+
+    function renderFiles() {
+      const visibleFiles = getVisibleFiles();
+      const filteredFiles = getFilteredFiles();
+
+      if (state.files.length === 0) {
+        fileList.innerHTML = '<div class="empty">还没有文件，先上传一个文档试试。</div>';
+        updateStats();
+        return;
+      }
+
+      if (filteredFiles.length === 0) {
+        fileList.innerHTML = state.searchKeyword
+          ? '<div class="empty">没有匹配当前搜索词的文件，试试换个关键词或清空搜索。</div>'
+          : '<div class="empty">当前分类下还没有文件，切换分类或先上传一个文档试试。</div>';
+        updateStats();
+        return;
+      }
+
+      fileList.innerHTML = filteredFiles.map((file) => {
+        const checked = state.selectedFileIds.has(file.file_id);
+        const category = normalizeCategory(file);
+
+        return `
+          <div class="file-item ${checked ? "selected" : ""}">
+            <label class="file-select">
+              <input type="checkbox" name="fileIds" value="${escapeHtml(file.file_id)}" ${checked ? "checked" : ""}>
+              <div>
+                <div class="file-header">
+                  <div>
+                    <div class="file-name">${escapeHtml(file.file_name)}</div>
+                    <div class="file-tag-row">
+                      <span class="meta-chip category">${escapeHtml(category.name)}</span>
+                      <span class="meta-chip">${escapeHtml(category.id)}</span>
+                      ${checked ? '<span class="selection-badge active">已纳入检索</span>' : ""}
+                    </div>
+                  </div>
+                </div>
+                <div class="file-desc-grid">
+                  <div class="file-desc">文件 ID：${escapeHtml(file.file_id)}</div>
+                  <div class="file-desc">创建时间：${escapeHtml(formatDate(file.created_at))}</div>
+                </div>
+              </div>
+            </label>
+            <div class="file-actions">
+              <button
+                class="ghost view-file-btn"
+                type="button"
+                data-file-id="${escapeHtml(file.file_id)}"
+              >
+                查看文件
+              </button>
+              <button
+                class="danger-button delete-file-btn"
+                type="button"
+                data-file-id="${escapeHtml(file.file_id)}"
+                data-file-name="${escapeHtml(file.file_name)}"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      updateStats();
     }
 
     function renderSessions() {
@@ -1402,6 +1853,8 @@
     }
 
     async function loadFiles() {
+      fileList.innerHTML = '<div class="empty">正在加载文件列表...</div>';
+
       try {
         const response = await fetch("/files");
         if (!response.ok) {
@@ -1417,13 +1870,87 @@
         );
 
         rebuildCategories();
-        updateStats();
+        renderCategories();
+        renderFiles();
       } catch (error) {
         state.files = [];
         state.categories = [];
         state.activeCategoryId = ALL_CATEGORY_VALUE;
+        fileList.innerHTML = `<div class="empty">${escapeHtml(error.message || "文件列表加载失败")}</div>`;
+        renderCategories();
         updateStats();
       }
+    }
+
+    async function uploadFile() {
+      const file = fileInput.files[0];
+      if (!file) {
+        setStatus(uploadStatus, "请先选择一个文档文件。", "error");
+        return;
+      }
+
+      const selectedCategory = CATEGORY_OPTIONS.find((category) => category.id === categorySelect.value) || CATEGORY_OPTIONS[0];
+      const categoryId = selectedCategory.id;
+      const categoryName = selectedCategory.name;
+      const formData = new FormData();
+      formData.append("file", file);
+
+      uploadBtn.disabled = true;
+      setStatus(uploadStatus, "正在上传并入库，请稍候...");
+
+      try {
+        const response = await fetch(`/upload?category_id=${encodeURIComponent(categoryId)}&category_name=${encodeURIComponent(categoryName)}`, {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || "上传失败");
+        }
+
+        state.selectedFileIds.add(data.file_id);
+        state.activeCategoryId = categoryId;
+        fileInput.value = "";
+        updateSelectedFileHint();
+        categorySelect.value = categoryId;
+        setStatus(uploadStatus, `上传成功：${data.file_name}（${data.file_id}）`, "success");
+        await loadFiles();
+      } catch (error) {
+        setStatus(uploadStatus, error.message || "上传失败", "error");
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    }
+
+    async function deleteFile(fileId, fileName) {
+      const confirmed = window.confirm(`确认删除文件“${fileName}”吗？这会同时清理向量库中的相关片段。`);
+      if (!confirmed) {
+        return;
+      }
+
+      setStatus(uploadStatus, `正在删除 ${fileName} ...`);
+
+      try {
+        const response = await fetch(`/files/${encodeURIComponent(fileId)}`, {
+          method: "DELETE"
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "删除失败");
+        }
+
+        state.selectedFileIds.delete(fileId);
+        setLastSourceCount([]);
+        setStatus(uploadStatus, `${fileName} 删除成功，已清理 ${data.deleted_vector_count || 0} 个向量片段。`, "success");
+        await loadFiles();
+      } catch (error) {
+        setStatus(uploadStatus, error.message || "删除失败", "error");
+      }
+    }
+
+    function viewFile(fileId) {
+      window.open(`/files/${encodeURIComponent(fileId)}/view`, "_blank", "noopener");
     }
 
     async function loadSessions() {
@@ -1747,6 +2274,63 @@
       }
     }
 
+    function selectAllFiles() {
+      const nextSelected = new Set(state.selectedFileIds);
+      getFilteredFiles().forEach((file) => nextSelected.add(file.file_id));
+      state.selectedFileIds = nextSelected;
+      renderFiles();
+    }
+
+    function clearSelection() {
+      if (state.activeCategoryId === ALL_CATEGORY_VALUE && !state.searchKeyword) {
+        state.selectedFileIds = new Set();
+      } else {
+        const visibleIds = new Set(getFilteredFiles().map((file) => file.file_id));
+        state.selectedFileIds = new Set(
+          Array.from(state.selectedFileIds).filter((fileId) => !visibleIds.has(fileId))
+        );
+      }
+      renderFiles();
+    }
+
+    fileList.addEventListener("change", (event) => {
+      if (!event.target || !event.target.matches("input[name='fileIds']")) {
+        return;
+      }
+
+      if (event.target.checked) {
+        state.selectedFileIds.add(event.target.value);
+      } else {
+        state.selectedFileIds.delete(event.target.value);
+      }
+
+      renderFiles();
+    });
+
+    fileList.addEventListener("click", (event) => {
+      const viewButton = event.target.closest(".view-file-btn");
+      if (viewButton) {
+        viewFile(viewButton.dataset.fileId || "");
+        return;
+      }
+
+      const deleteButton = event.target.closest(".delete-file-btn");
+      if (deleteButton) {
+        deleteFile(deleteButton.dataset.fileId || "", deleteButton.dataset.fileName || "当前文件");
+      }
+    });
+
+    categoryList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-category-id]");
+      if (!button) {
+        return;
+      }
+
+      state.activeCategoryId = button.dataset.categoryId || ALL_CATEGORY_VALUE;
+      renderCategories();
+      renderFiles();
+    });
+
     sessionList.addEventListener("click", (event) => {
       const button = event.target.closest("[data-session-id]");
       if (!button) {
@@ -1785,7 +2369,16 @@
     }
 
     queryInput.addEventListener("input", autoResizeQueryInput);
+    fileInput.addEventListener("change", updateSelectedFileHint);
+    fileSearchInput.addEventListener("input", (event) => {
+      state.searchKeyword = String(event.target.value || "").trim();
+      renderFiles();
+    });
 
+    uploadBtn.addEventListener("click", uploadFile);
+    refreshBtn.addEventListener("click", loadFiles);
+    selectAllBtn.addEventListener("click", selectAllFiles);
+    clearSelectionBtn.addEventListener("click", clearSelection);
     chatViewBtn.addEventListener("click", () => {
       window.location.href = "/";
     });
@@ -1794,6 +2387,9 @@
     });
     openLibraryBtn.addEventListener("click", () => {
       window.location.href = "/library";
+    });
+    backToChatBtn.addEventListener("click", () => {
+      window.location.href = "/";
     });
     newSessionBtn.addEventListener("click", startNewSession);
     refreshSessionsBtn.addEventListener("click", async () => {
@@ -1805,19 +2401,12 @@
     askBtn.addEventListener("click", askQuestion);
 
     async function initializePage() {
+      switchView("library");
+      updateSelectedFileHint();
       updateStats();
-      renderSessions();
-      renderConversation();
-      setLastSourceCount([]);
-      autoResizeQueryInput();
-
-      await Promise.all([loadFiles(), loadSessions()]);
-
-      if (state.activeSessionId && isPersistedSession(state.activeSessionId)) {
-        await loadSessionMessages(state.activeSessionId);
-      } else {
-        startNewSession();
-      }
+      renderCategories();
+      renderFiles();
+      await loadFiles();
     }
 
     initializePage();
