@@ -8,7 +8,7 @@ from file_store import count_records_by_saved_path, delete_file_record, get_file
 from models import  ChunkRecord, ChunkMetadata
 
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 CHROMA_DIR = BASE_DIR / "data" / "chroma_db"
 CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
