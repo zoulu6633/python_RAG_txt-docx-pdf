@@ -1,3 +1,4 @@
+from langchain_core.documents import Document
 from services.retriever import retrieve_documents, serialize_documents
 from file_store import save_chat_message, list_recent_chat_messages, ensure_chat_session
 from models import ChatResponse, ChatMessage
