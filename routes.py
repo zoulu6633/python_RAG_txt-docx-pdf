@@ -7,16 +7,20 @@ from pathlib import Path
 import shutil
 from file_store import generate_file_id, get_file_record, init_file_db, list_file_records, save_file_record, list_chat_sessions, list_recent_chat_messages, save_chat_message
 from models import ChatResponse, FileRecord, QueryRequest, SourceChunk
-from services import add_documents, chat, delete_document_assets, get_chunk, chat_stream
+from services.chat import chat, chat_stream
+from services.files import add_documents, delete_document_assets
+from services.retriever import  get_chunk
 
 router = APIRouter()
 BASE_DIR = Path(__file__).resolve().parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-STATIC_DIR = BASE_DIR / "static"
+DATA_DIR = BASE_DIR / "data"
+UPLOAD_DIR = DATA_DIR / "uploads"   
+STATIC_DIR = DATA_DIR / "static"
 FRONTEND_FILE = STATIC_DIR / "index.html"
 LIBRARY_FRONTEND_FILE = STATIC_DIR / "library.html"
-UPLOAD_DIR.mkdir(exist_ok=True)
-STATIC_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
 init_file_db()
 
 @router.get("/")

@@ -11,14 +11,17 @@ from file_store import count_records_by_saved_path, delete_file_record, get_file
 from models import ChatResponse, ChunkRecord, ChunkMetadata, SourceChunk, ChatMessage
 from llm import get_answer, stream_answer, build_retrieval_queries
 
-
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+CHROMA_DIR = DATA_DIR / "chroma_db"
+CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
 embeddings = HuggingFaceEmbeddings(
     model_name="BAAI/bge-small-zh-v1.5"
 )
 
 vectorstore = Chroma(
-    persist_directory="./chroma_db",
+    persist_directory=str(CHROMA_DIR),
     embedding_function=embeddings,
     collection_name="documents"
 )

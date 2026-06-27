@@ -44,11 +44,11 @@ RAG-project/
 ├─ llm.py              # 大模型调用与提示词
 ├─ file_store.py       # SQLite 文件记录管理
 ├─ models.py           # Pydantic 数据模型
-├─ static/
-│  └─ index.html       # 前端页面
-├─ uploads/            # 上传后的物理文件
-├─ chroma_db/          # Chroma 持久化目录
-├─ app.db              # SQLite 数据库
+├─ data/
+│  ├─ static/          # 前端页面
+│  ├─ uploads/         # 上传后的物理文件
+│  ├─ chroma_db/       # Chroma 持久化目录
+│  └─ app.db           # SQLite 数据库
 └─ requirements.txt    # 项目依赖
 ```
 
@@ -141,7 +141,7 @@ uvicorn main:app --reload
 {
   "file_id": "doc_000001",
   "file_name": "人工智能发展史.txt",
-  "path": "C:/.../uploads/doc_000001_人工智能发展史.txt"
+  "path": "C:/.../data/uploads/doc_000001_人工智能发展史.txt"
 }
 ```
 
@@ -259,4 +259,3 @@ doc_000001_原文件名.txt
 - `requirements.txt` 是否已完整安装
 - `.env` 中的 `OPENAI_API_KEY` 是否正确
 - 首次运行时 HuggingFace 模型是否成功下载
-
