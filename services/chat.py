@@ -27,19 +27,29 @@ def format_context(documents: list[Document]) -> str:
 
     return "\n\n".join(context_blocks)
 
-def chat(query: str, session_id: str, user_id: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
+def load_chat_history(session_id: str,user_id: str):
     ensure_chat_session(session_id, user_id)
     stored_messages = list_recent_chat_messages(session_id, limit=10)
     history_messages = [
     ChatMessage(role=item["role"], content=item["content"])
     for item in stored_messages
     ]
+    return history_messages
+
+def retrieve_chat_sources(query, user_id, file_ids, category_ids, history_messages):
+    reranked_results = retrieve_documents(query, user_id, file_ids, category_ids, history_messages)
+    sources = serialize_documents(reranked_results)
+    context = format_context(reranked_results)
+    return sources, context
+
+def chat(query: str, session_id: str, user_id: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
+    history_messages = load_chat_history(session_id, user_id)
+
     # 先保存用户消息，避免模型调用失败时整轮丢失
     save_chat_message(session_id, "user", query)
     try:
     
-        reranked_results = retrieve_documents(query, file_ids, category_ids, history_messages)
-        sources = serialize_documents(reranked_results)
+        sources, context = retrieve_chat_sources(query, user_id, file_ids, category_ids, history_messages)
         selected_file_ids = file_ids or []
 
         if not sources:
@@ -53,8 +63,6 @@ def chat(query: str, session_id: str, user_id: str, file_ids: list[str] | None =
                 selected_file_ids=selected_file_ids,
             )
 
-        context = format_context(reranked_results)
-    
         answer = get_answer(query, context, history_messages)
         if not answer:
             answer = "在提供的文档中没有找到相关信息。"
@@ -74,17 +82,12 @@ def chat(query: str, session_id: str, user_id: str, file_ids: list[str] | None =
     )
 
 def chat_stream(query: str, session_id: str, user_id: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
-    ensure_chat_session(session_id, user_id)
-    stored_messages = list_recent_chat_messages(session_id, limit=10)
-    history_messages = [
-    ChatMessage(role=item["role"], content=item["content"])
-    for item in stored_messages
-    ]
+    history_messages = load_chat_history(session_id, user_id)
+
     # 先保存用户消息，避免模型调用失败时整轮丢失
     save_chat_message(session_id, "user", query)
     try:
-        reranked_results = retrieve_documents(query, file_ids, category_ids, history_messages)
-        sources = serialize_documents(reranked_results)
+        sources, context = retrieve_chat_sources(query, user_id, file_ids, category_ids, history_messages)
         selected_file_ids = file_ids or []
 
         if not sources:
@@ -100,8 +103,6 @@ def chat_stream(query: str, session_id: str, user_id: str, file_ids: list[str] |
                 "selected_file_ids": selected_file_ids,
             }
             return
-
-        context = format_context(reranked_results)
 
         yield {
         "type": "meta",

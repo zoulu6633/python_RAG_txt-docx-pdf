@@ -22,7 +22,7 @@ class ChunkRecord(BaseModel):
 class QueryRequest(BaseModel):
     query: str
     session_id: str
-    user_id: str
+    user_id: str | None = None
     file_ids: list[str] | None = None
     category_ids: list[str] | None = None
 
@@ -54,3 +54,29 @@ class ChatResponse(BaseModel):
     source_count: int
     selected_file_ids: list[str]
 
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserInfo(BaseModel):
+    user_id: str
+    username: str
+    created_at: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    expires_at: str
+    user: UserInfo
+
+
+class MessageResponse(BaseModel):
+    message: str

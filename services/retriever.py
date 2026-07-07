@@ -1,33 +1,19 @@
 from langchain_core.documents import Document
-from langchain_community.cross_encoders import HuggingFaceCrossEncoder
-from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
-from pathlib import Path
 from models import ChatMessage, SourceChunk
-from services.files import vectorstore
+from services.vector_store import vectorstore, compressor
 from llm import build_retrieval_queries
 
-BASE_DIR = Path(__file__).resolve().parent
-CHROMA_DIR = BASE_DIR / "data" / "chroma_db"
-CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
-# 加载重排模型
-rerank_model = HuggingFaceCrossEncoder(
-    model_name="BAAI/bge-reranker-base"
-)
 
-# 定义重排器，只保留前 5
-compressor = CrossEncoderReranker(
-    model=rerank_model,
-    top_n=5
-)
 
 # 构建搜索参数
 def build_search_kwargs(
+    user_id: str,
     file_ids: list[str] | None = None,
     category_ids: list[str] | None = None
 ):
     search_kwargs = {"k": 10}
-    filters = []
+    filters = [{"user_id": user_id}]
 
     if file_ids:
         if len(file_ids) == 1:
@@ -50,12 +36,13 @@ def build_search_kwargs(
 
 # 构建基础检索器
 def build_retriever(
+    user_id: str,
     file_ids: list[str] | None = None,
     category_ids: list[str] | None = None
 ):
     base_retriever = vectorstore.as_retriever(
         search_type="similarity",
-        search_kwargs=build_search_kwargs(file_ids, category_ids)
+        search_kwargs=build_search_kwargs(user_id, file_ids, category_ids)
     )
 
     return base_retriever
@@ -80,11 +67,12 @@ def deduplicate_documents(documents: list[Document]) -> list[Document]:
 # 检索文档
 def retrieve_documents(
     query: str,
+    user_id: str,
     file_ids: list[str] | None = None,
     category_ids: list[str] | None = None,
     history_messages: list[ChatMessage] | None = None
 ) -> list[Document]:
-    retriever = build_retriever(file_ids, category_ids)
+    retriever = build_retriever(user_id, file_ids, category_ids)
 
     search_queries = build_retrieval_queries(query, history_messages)
 
@@ -128,6 +116,11 @@ def serialize_documents(documents: list[Document]) -> list[SourceChunk]:
 
     return serialized
 
-def get_chunk(query: str, file_ids: list[str] | None = None, category_ids: list[str] | None = None):
-    retriever_results = retrieve_documents(query, file_ids, category_ids)
+def get_chunk(
+    query: str,
+    user_id: str,
+    file_ids: list[str] | None = None,
+    category_ids: list[str] | None = None,
+):
+    retriever_results = retrieve_documents(query, user_id, file_ids, category_ids)
     return serialize_documents(retriever_results)

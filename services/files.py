@@ -1,34 +1,10 @@
 from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader, TextLoader
 from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
 from pathlib import Path
-from file_store import count_records_by_saved_path, delete_file_record, get_file_record, save_chat_message, list_recent_chat_messages, ensure_chat_session, list_chat_sessions, delete_chat_messages    
+from file_store import count_records_by_saved_path, delete_file_record, get_file_record 
 from models import  ChunkRecord, ChunkMetadata
+from services.vector_store import vectorstore, splitter, CHUNK_OVERLAP
 
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-CHROMA_DIR = BASE_DIR / "data" / "chroma_db"
-CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-
-embeddings = HuggingFaceEmbeddings(
-    model_name="BAAI/bge-small-zh-v1.5"
-)
-
-vectorstore = Chroma(
-    persist_directory=str(CHROMA_DIR),
-    embedding_function=embeddings,
-    collection_name="documents"
-)
-
-CHUNK_SIZE = 300
-CHUNK_OVERLAP = 80
-
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=CHUNK_SIZE,
-    chunk_overlap=0
-)
 
 # 强制添加重叠
 def add_forced_overlap(split_docs: list[Document]) -> list[Document]:

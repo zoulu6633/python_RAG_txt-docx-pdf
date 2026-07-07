@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, UTC
 from pathlib import Path
+from uuid import uuid4
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -25,6 +26,27 @@ def init_file_db() -> None:
             CREATE TABLE IF NOT EXISTS app_meta (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                token TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
             )
             """
         )
@@ -68,6 +90,12 @@ def init_file_db() -> None:
             """
             INSERT OR IGNORE INTO app_meta(key, value)
             VALUES ('file_seq', '0')
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id
+            ON user_sessions(user_id);
             """
         )
         connection.execute(
@@ -117,6 +145,127 @@ def save_file_record(
             (file_id, file_name, saved_path, user_id, created_at, category_id, category_name),
         )
         connection.commit()
+
+
+def create_user(username: str, password_hash: str) -> dict[str, str]:
+    init_file_db()
+    user_id = f"user_{uuid4().hex[:12]}"
+    created_at = datetime.now(UTC).isoformat()
+
+    with _get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO users(user_id, username, password_hash, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, username, password_hash, created_at),
+        )
+        connection.commit()
+
+    return {
+        "user_id": user_id,
+        "username": username,
+        "created_at": created_at,
+    }
+
+
+def get_user_by_username(username: str) -> dict[str, str] | None:
+    init_file_db()
+
+    with _get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT user_id, username, password_hash, created_at
+            FROM users
+            WHERE username = ?
+            """,
+            (username,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
+def get_user_by_id(user_id: str) -> dict[str, str] | None:
+    init_file_db()
+
+    with _get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT user_id, username, password_hash, created_at
+            FROM users
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
+def save_user_session(token: str, user_id: str, expires_at: str) -> None:
+    init_file_db()
+    created_at = datetime.now(UTC).isoformat()
+
+    with _get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO user_sessions(token, user_id, created_at, expires_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (token, user_id, created_at, expires_at),
+        )
+        connection.commit()
+
+
+def get_user_by_session_token(token: str) -> dict[str, str] | None:
+    init_file_db()
+    now = datetime.now(UTC).isoformat()
+
+    with _get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT users.user_id, users.username, users.password_hash, users.created_at
+            FROM user_sessions
+            JOIN users ON users.user_id = user_sessions.user_id
+            WHERE user_sessions.token = ?
+            AND user_sessions.expires_at > ?
+            """,
+            (token, now),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
+def delete_user_session(token: str) -> bool:
+    init_file_db()
+
+    with _get_connection() as connection:
+        cursor = connection.execute(
+            """
+            DELETE FROM user_sessions
+            WHERE token = ?
+            """,
+            (token,),
+        )
+        connection.commit()
+
+    return cursor.rowcount > 0
+
+
+def delete_expired_user_sessions() -> int:
+    init_file_db()
+    now = datetime.now(UTC).isoformat()
+
+    with _get_connection() as connection:
+        cursor = connection.execute(
+            """
+            DELETE FROM user_sessions
+            WHERE expires_at <= ?
+            """,
+            (now,),
+        )
+        connection.commit()
+
+    return cursor.rowcount
 
 
 def list_file_records(user_id: str | None = None) -> list[dict[str, str]]:
