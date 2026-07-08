@@ -6,7 +6,8 @@ import hmac
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from file_store import (
     create_user,
@@ -20,6 +21,7 @@ from file_store import (
 
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 PASSWORD_ITERATIONS = 100_000
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _normalize_username(username: str) -> str:
@@ -106,27 +108,30 @@ def login_user(username: str, password: str) -> tuple[dict[str, str], str, str]:
     return _public_user(user), token, expires_at
 
 
-def parse_bearer_token(authorization: str | None) -> str:
-    if not authorization:
+def parse_bearer_token(credentials: HTTPAuthorizationCredentials | None) -> str:
+    if not credentials:
         raise HTTPException(status_code=401, detail="请先登录")
 
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token.strip():
+    if credentials.scheme.lower() != "bearer" or not credentials.credentials.strip():
         raise HTTPException(status_code=401, detail="登录凭证无效")
 
-    return token.strip()
+    return credentials.credentials.strip()
 
 
-def get_current_user(authorization: str | None = Header(default=None)) -> dict[str, str]:
-    token = parse_bearer_token(authorization)
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> dict[str, str]:
+    token = parse_bearer_token(credentials)
     user = get_user_by_session_token(token)
     if not user:
         raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
     return _public_user(user)
 
 
-def get_current_token(authorization: str | None = Header(default=None)) -> str:
-    return parse_bearer_token(authorization)
+def get_current_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> str:
+    return parse_bearer_token(credentials)
 
 
 def logout_user(token: str = Depends(get_current_token)) -> dict[str, str]:
