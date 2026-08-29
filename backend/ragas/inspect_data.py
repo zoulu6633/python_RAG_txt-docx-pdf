@@ -16,7 +16,7 @@ from services.vector_store import vectorstore
 
 # ---- 获取所有数据 ----
 kb_data = vectorstore.get(
-    where={"knowledge_base_id": "kb_812649b28fe6"},
+    where={"knowledge_base_id": "kb_f612e6e0e202"},
     include=["documents", "metadatas"]
 )
 

@@ -178,7 +178,16 @@ pip install ragas datasets
 python ragas/evaluate.py    # 运行时输入知识库 ID，或通过环境变量 RAGAS_KB_ID 指定
 ```
 
-评估流程：读取 `ragas/test_data.json` 中的测试问题与标准答案 → 逐题执行完整 RAG 流水线（检索 → 生成）→ 使用 RAGAS 计算 faithfulness、answer_relevancy、context_precision、context_recall 等指标，输出逐题得分与平均分。
+评估流程：读取测试集中的测试问题与标准答案 → 逐题执行完整 RAG 流水线（检索 → 生成）→ 使用 RAGAS 计算 faithfulness、answer_relevancy、context_precision、context_recall 等指标，输出逐题得分与平均分。
+
+测试集位于 `ragas/` 目录，通过环境变量 `RAGAS_TEST_DATA` 指定（默认 `test_data.json`）：
+
+| 文件 | 内容 |
+|------|------|
+| `test_data.json` | 初始测试集（10 题） |
+| `test_data_v2.json` | 扩展测试集（38 题，覆盖 6 篇 AI 发展史文档，含 `source` 字段标注题目来源） |
+| `test_data_negative.json` | 域外负例集（8 题，考察拒答行为，单独运行、单独汇报，不计入均分） |
+| `test_docs/` | 扩展语料文档（3 篇），需先通过前端上传至知识库后评估才有效 |
 
 ## 环境变量
 

@@ -2,7 +2,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
-from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,13 +26,7 @@ splitter = RecursiveCharacterTextSplitter(
     chunk_overlap=0
 )
 
-# 加载重排模型
+# 加载重排模型（打分逻辑在 services/retriever.py，分数写入 relevance_score）
 rerank_model = HuggingFaceCrossEncoder(
     model_name="BAAI/bge-reranker-base"
-)
-
-# 定义重排器，只保留前 5
-compressor = CrossEncoderReranker(
-    model=rerank_model,
-    top_n=5
 )

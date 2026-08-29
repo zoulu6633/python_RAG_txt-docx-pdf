@@ -1,0 +1,10 @@
+[
+  {"question": "量子计算中的量子比特与经典比特有什么区别？", "ground_truth": "在知识库文档中未找到相关信息"},
+  {"question": "区块链是如何保证数据不可篡改的？", "ground_truth": "在知识库文档中未找到相关信息"},
+  {"question": "光合作用分为哪两个阶段？", "ground_truth": "在知识库文档中未找到相关信息"},
+  {"question": "《红楼梦》的作者是谁？", "ground_truth": "在知识库文档中未找到相关信息"},
+  {"question": "詹姆斯·韦伯太空望远镜的主要科学目标是什么？", "ground_truth": "在知识库文档中未找到相关信息"},
+  {"question": "如何冲泡一杯手冲咖啡？", "ground_truth": "在知识库文档中未找到相关信息"},
+  {"question": "马拉松比赛的标准距离是多少公里？", "ground_truth": "在知识库文档中未找到相关信息"},
+  {"question": "Excel中的VLOOKUP函数怎么使用？", "ground_truth": "在知识库文档中未找到相关信息"}
+]

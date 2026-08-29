@@ -15,8 +15,8 @@ load_dotenv()
 
 llm = ChatOpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    model_name="qwen3.7-max",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    model_name=os.getenv("LLM_MODEL", "qwen-max"),
+    base_url=os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
     streaming=True,
 )
 

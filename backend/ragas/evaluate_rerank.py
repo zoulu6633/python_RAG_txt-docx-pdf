@@ -1,9 +1,9 @@
 """
-RAGAS 评估脚本（不调用重排）
+RAGAS 评估脚本
 
 流程：
   1. 从 test_data.json 加载测试问题 + ground truth
-  2. 对每个问题执行 RAG 检索（仅向量召回，不做重排）→ 生成回答
+  2. 对每个问题执行 RAG 检索 → 生成回答
   3. 用 RAGAS 指标评分（faithfulness, answer_relevancy, context_precision, context_recall）
   4. 输出评估结果表格
 
@@ -19,8 +19,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-
-from langchain_core.documents import Document
 
 # ── 路径设置 ──
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,58 +38,6 @@ from eval_config import (
     load_eval_config,
 )
 
-
-def _build_search_kwargs(knowledge_base_id: str | None = None) -> dict:
-    search_kwargs: dict = {"k": 10}
-    if knowledge_base_id:
-        search_kwargs["filter"] = {"knowledge_base_id": knowledge_base_id}
-    return search_kwargs
-
-
-def _deduplicate_documents(documents: list[Document]) -> list[Document]:
-    unique: list[Document] = []
-    seen: set[str] = set()
-
-    for doc in documents:
-        meta = doc.metadata or {}
-        key = meta.get("chunk_id") or f"{meta.get('document_id', '')}:{doc.page_content}"
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(doc)
-
-    return unique
-
-
-def retrieve_documents_without_rerank(
-    query: str,
-    knowledge_base_id: str | None = None,
-) -> list[Document]:
-    from services.llm import build_retrieval_queries
-    from services.vector_store import vectorstore
-
-    search_kwargs = _build_search_kwargs(knowledge_base_id)
-    search_queries = build_retrieval_queries(query)
-
-    candidates: list[Document] = []
-    for sq in search_queries:
-        results = vectorstore.similarity_search_with_score(
-            query=sq,
-            k=search_kwargs["k"],
-            filter=search_kwargs.get("filter"),
-        )
-        for doc, score in results:
-            doc.metadata["similarity_score"] = score
-            candidates.append(doc)
-
-    unique_candidates = _deduplicate_documents(candidates)
-
-    # 与重排版对齐：同样只取 top 5，确保 A/B 差异只来自「重排排序」而非「上下文条数」
-    # （Chroma similarity_search_with_score 返回 L2 距离，越小越相似）
-    unique_candidates.sort(key=lambda d: d.metadata.get("similarity_score", float("inf")))
-    return unique_candidates[:5]
-
-
 # ── 1. 加载测试数据 ──
 test_data_path = os.path.join(os.path.dirname(__file__), "datas", os.getenv("RAGAS_TEST_DATA", "test_data.json"))
 with open(test_data_path, "r", encoding="utf-8") as f:
@@ -103,20 +49,21 @@ metrics = build_metrics(config)
 metric_names = [m.name if hasattr(m, "name") else str(m) for m in metrics]
 kb_id_env = get_knowledge_base_id_env(config)
 
-print(f"已加载 {len(test_cases)} 条测试用例（无重排）")
+print(f"已加载 {len(test_cases)} 条测试用例")
 print(f"当前评测模板: {template_name}")
 print(f"当前评测指标: {', '.join(metric_names)}")
 print(f"当前评测模型: {config['llm'].get('model')}")
 print(f"当前 base_url: {config['llm'].get('base_url')}\n")
 
 # ── 2. 获取知识库 ID ──
+# 优先从环境变量读取，否则交互式输入
 KNOWLEDGE_BASE_ID = os.getenv(kb_id_env)
 if not KNOWLEDGE_BASE_ID:
     KNOWLEDGE_BASE_ID = input("请输入知识库 ID: ").strip()
     print()
 
 # ── 3. 运行 RAG 流水线 ──
-from services.retriever import format_context
+from services.retriever import retrieve_documents, format_context
 from services.llm import get_answer
 
 questions = []
@@ -128,13 +75,10 @@ for i, case in enumerate(test_cases, start=1):
     q = case["question"]
     gt = case["ground_truth"]
 
-    print(f"[{i}/{len(test_cases)}] 检索中（无重排）: {q[:50]}...", end=" ", flush=True)
+    print(f"[{i}/{len(test_cases)}] 检索中: {q[:50]}...", end=" ", flush=True)
 
-    # 检索：只做向量召回，不做 CrossEncoder 重排
-    docs = retrieve_documents_without_rerank(
-        query=q,
-        knowledge_base_id=KNOWLEDGE_BASE_ID,
-    )
+    # 检索
+    docs = retrieve_documents(query=q, knowledge_base_id=KNOWLEDGE_BASE_ID)
     ctx = format_context(docs)
     ctx_chunks = [d.page_content for d in docs]
 
@@ -149,10 +93,10 @@ for i, case in enumerate(test_cases, start=1):
     print("完成")
 
 # ── 4. RAGAS 评估 ──
-print("\n正在运行 RAGAS 评估（无重排）...")
+print("\n正在运行 RAGAS 评估...")
 
-from datasets import Dataset
 from ragas import evaluate
+from datasets import Dataset
 
 dataset = Dataset.from_dict({
     "question": questions,
@@ -176,12 +120,13 @@ df = result.to_pandas()
 df.insert(0, "question", questions)
 
 print("\n" + "=" * 70)
-print("RAGAS 评估结果（无重排）")
+print("RAGAS 评估结果")
 print("=" * 70)
 print()
 
+# 逐题输出
 for idx, row in df.iterrows():
-    print(f"── 问题 {idx + 1}: {questions[idx][:60]}...")
+    print(f"── 问题 {idx+1}: {questions[idx][:60]}...")
     print(f"   回答: {answers[idx][:100]}...")
     for col in metrics:
         col_name = col.name if hasattr(col, "name") else str(col)

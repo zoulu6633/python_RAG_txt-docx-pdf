@@ -7,6 +7,7 @@ import {
   type KnowledgeBaseInfo, type DocumentInfo, type MemberInfo, type SourceInfo,
   type SessionInfo, type ChatMessageInfo,
 } from '@/api';
+import { relevanceScoreStyle } from '@/lib/utils';
 import {
   ArrowLeft, FileText, Users, MessageSquare, Trash2, Upload, Loader2, Download,
   Clock, CheckCircle2, XCircle, AlertCircle, RefreshCcw, Lock, Globe,
@@ -811,7 +812,12 @@ export default function KBDetailPage() {
                                     <FileText className="w-3 h-3" />
                                     <span className="truncate max-w-[100px]">{src.title}</span>
                                     <span className="text-slate-300">·</span>
-                                    <span className="text-[#0d9488] font-medium">{(src.score * 100).toFixed(0)}%</span>
+                                    <span
+                                      className={`font-medium ${relevanceScoreStyle(src.score)}`}
+                                      title={`重排相关性 ${(src.score * 100).toFixed(0)}%`}
+                                    >
+                                      {(src.score * 100).toFixed(0)}%
+                                    </span>
                                   </span>
                                   {src.content && (
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-2.5 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-pre-wrap break-words max-h-40 overflow-y-auto">

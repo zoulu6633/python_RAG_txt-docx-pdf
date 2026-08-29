@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/AppLayout';
 import { chatApi, knowledgeBaseApi, type KnowledgeBaseInfo } from '@/api';
+import { relevanceScoreStyle } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import {
   ArrowLeft,
@@ -161,7 +162,10 @@ export default function ChatPage() {
                               <FileText className="w-3 h-3" />
                               <span className="truncate max-w-[120px]">{source.title}</span>
                               <span className="text-slate-300">·</span>
-                              <span className="text-[#0d9488] font-medium">
+                              <span
+                                className={`font-medium ${relevanceScoreStyle(source.score)}`}
+                                title={`重排相关性 ${(source.score * 100).toFixed(0)}%`}
+                              >
                                 {(source.score * 100).toFixed(0)}%
                               </span>
                             </div>

@@ -1,0 +1,43 @@
+{
+  "active_template": "standard",
+  "templates": {
+    "standard": {
+      "description": "默认标准评测模板，兼顾检索质量与回答质量",
+      "metrics": [
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+        "answer_correctness"
+      ]
+    },
+    "retrieval_focus": {
+      "description": "偏重检索阶段质量的评测模板",
+      "metrics": [
+        "context_precision",
+        "context_recall",
+        "faithfulness"
+      ]
+    },
+    "answer_focus": {
+      "description": "偏重回答质量的评测模板",
+      "metrics": [
+        "faithfulness",
+        "answer_relevancy",
+        "answer_correctness"
+      ]
+    }
+  },
+  "llm": {
+    "api_key_env": "OPENAI_API_KEY",
+    "model": "qwen-max",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "temperature": 0
+  },
+  "embeddings": {
+    "model_name": "BAAI/bge-small-zh-v1.5"
+  },
+  "retrieval": {
+    "knowledge_base_id_env": "RAGAS_KB_ID"
+  }
+}

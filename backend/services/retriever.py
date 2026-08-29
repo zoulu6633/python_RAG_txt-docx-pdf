@@ -4,7 +4,9 @@ from langchain_core.documents import Document
 
 from schemas import ChatMessage, SourceInfo
 from services.llm import build_retrieval_queries
-from services.vector_store import compressor, vectorstore
+from services.vector_store import rerank_model, vectorstore
+
+RERANK_TOP_N = 5
 
 
 def _build_search_kwargs(
@@ -33,6 +35,21 @@ def _deduplicate_documents(documents: list[Document]) -> list[Document]:
     return unique
 
 
+def _rerank_documents(documents: list[Document], query: str) -> list[Document]:
+    pairs = [(query, doc.page_content) for doc in documents]
+    scores = rerank_model.score(pairs)
+    ranked = sorted(
+        zip(documents, scores, strict=False),
+        key=lambda pair: pair[1],
+        reverse=True,
+    )
+    top_documents: list[Document] = []
+    for doc, score in ranked[:RERANK_TOP_N]:
+        doc.metadata["relevance_score"] = float(score)
+        top_documents.append(doc)
+    return top_documents
+
+
 def retrieve_documents(
     query: str,
     knowledge_base_id: str | None = None,
@@ -58,8 +75,7 @@ def retrieve_documents(
         return []
 
     rerank_query = search_queries[0] if search_queries else query
-    reranked_results = compressor.compress_documents(unique_candidates, query=rerank_query)
-    return list(reranked_results)
+    return _rerank_documents(unique_candidates, rerank_query)
 
 
 def serialize_sources(documents: list[Document]) -> list[SourceInfo]:
@@ -69,7 +85,13 @@ def serialize_sources(documents: list[Document]) -> list[SourceInfo]:
         content = doc.page_content.strip()
         if not content:
             continue
-        score = meta.get("relevance_score") or meta.get("similarity_score", 0.0)
+        relevance = meta.get("relevance_score")
+        if relevance is not None:
+            score = float(relevance)
+        else:
+            # 无重排路径：Chroma 返回 L2 距离（越小越好），转为 0~1 相似度统一量纲
+            distance = float(meta.get("similarity_score", 0.0))
+            score = 1.0 / (1.0 + distance)
         serialized.append(SourceInfo(
             document_id=meta.get("document_id", ""),
             title=meta.get("document_name", "未知文档"),
