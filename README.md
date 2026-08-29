@@ -9,8 +9,8 @@
 | **后端框架** | FastAPI + Uvicorn |
 | **数据库** | MySQL 8 (aiomysql + SQLAlchemy 异步 ORM) |
 | **向量数据库** | ChromaDB |
-| **LLM** | 通义千问 Qwen3.7-Plus (阿里云 DashScope) |
-| **RAG 框架** | LangChain (LCEL)、LangGraph |
+| **LLM** | 通义千问 Qwen3.7-Max (阿里云 DashScope) |
+| **RAG 框架** | LangChain (LCEL) |
 | **Embedding** | sentence-transformers |
 | **文档解析** | PyPDF、docx2txt |
 | **前端** | React 18 + Vite 6 + TypeScript 5.8 |
@@ -29,6 +29,7 @@
   - 引用来源展示（可查看原文片段和匹配分数）
 - **会话管理** — 多会话支持、历史记录、会话重命名、删除
 - **成员权限** — 支持 owner / admin / viewer 三种角色
+- **效果评估** — 内置 RAGAS 离线评估脚本（faithfulness / answer_relevancy / context_precision / context_recall）
 
 ## 快速开始
 
@@ -167,9 +168,22 @@ interfaces/ (路由层) → services/ (业务层) → crud/ (数据层)
 → CrossEncoder 重排序 → 格式化为上下文 → LLM 生成回答（流式）→ 保存消息
 ```
 
+## 效果评估（RAGAS）
+
+内置离线评估脚本 `backend/ragas/evaluate.py`，用于量化 RAG 检索与生成质量：
+
+```bash
+cd backend
+pip install ragas datasets
+python ragas/evaluate.py    # 运行时输入知识库 ID，或通过环境变量 RAGAS_KB_ID 指定
+```
+
+评估流程：读取 `ragas/test_data.json` 中的测试问题与标准答案 → 逐题执行完整 RAG 流水线（检索 → 生成）→ 使用 RAGAS 计算 faithfulness、answer_relevancy、context_precision、context_recall 等指标，输出逐题得分与平均分。
+
 ## 环境变量
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `OPENAI_API_KEY` | DashScope API Key | — |
 | `DATABASE_URL` | MySQL 连接串 | `mysql+aiomysql://root:123456@localhost/rag?charset=utf8mb4` |
+| `RAGAS_KB_ID` | RAGAS 评估的知识库 ID | — |
